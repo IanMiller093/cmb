@@ -36,11 +36,14 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
 
     # add some random noise?  Gaussian noise taken from matched filtering notebook
     # definitely ask Zach about this
+    # gonna comment this out briefly, I wanna double check and see if the power spectrum is more normal w/o this
+    # only some minor things came from commenting it out, to be expected, may as well keep.
     pixarea = enmap.pixsizemap(shape, wcs)
     ivar = 10**-2*pixarea/utils.arcmin**2
     for i in range(3):
         noise = enmap.rand_gauss(shape, wcs) * np.sqrt(1/ivar)
         imap[i] += noise
+    
 
     # apodize if not fullsky
     # I'm preeeeeeeetty sure you don't have to apodize if it's the full sky?  Cuz it loops around right?
@@ -48,10 +51,8 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
     w2 = 1
     tapered_imap = imap.copy()
     if not fullsky_bool:
-        # VERY VERY unsure about these next 3 lines
-        res_arcmin = 3600 / sky.nside
-        map_pixels = int((2 * radius_degrees * 60) / res_arcmin)
-        apod_width = max(5, map_pixels // 8)
+        # deleted the three lines I was unsure of for this...
+        apod_width = max(5, shape[1] // 8)
         # from spherical harmonics notebook
         taper_mask = enmap.apod(enmap.ones(imap[0].shape, imap[0].wcs), width=apod_width)
         w2 = np.sum(taper_mask.pixsizemap() * taper_mask**2) / (4*np.pi)
