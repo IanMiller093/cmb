@@ -30,11 +30,9 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
 
     # initialize imap_hp from sky
     imap_hp = sky.get_emission(f_GHz * u.GHz).value
-    print(imap_hp.shape)
 
     # reproject to get only a tiny segment
     imap = reproject.healpix2map(imap_hp, shape, wcs)
-    print(imap.shape)
 
     # add some random noise?  Gaussian noise taken from matched filtering notebook
     # definitely ask Zach about this
@@ -63,21 +61,15 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
         for i in range(3):
             tapered_imap[i] = taper_mask * imap[i]
 
-    print(tapered_imap.shape)
-
     # lmax is no longer arbitrarily large, changed it to have a set formula
     lmax = 2 * sky.nside
     alms = curvedsky.map2alm(tapered_imap, lmax=lmax)
     cl = curvedsky.alm2cl(alms) / w2
     l = np.arange(cl.shape[1])
 
-    print(alms.shape)
-    print(cl.shape)
-    print(l.shape)
-
     for i in range(3):
         plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-    plt.ylim(1e-1, 1e9)
+    plt.ylim(-1e4, 1e4)
     plt.legend()
 
     plt.savefig("power_spectra.png", dpi=150, bbox_inches="tight")
