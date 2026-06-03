@@ -71,4 +71,4 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
 # testing it out with sky with d0 dust and CMB
 sky = pysm3.Sky(nside=512, preset_strings=["d0", "c1"])
 # r = 1 was too small, I think, it led to a 9x9 map lol
-show_power_spectra(sky, 100, 0, 0, 5, False)
+show_power_spectra(sky, 100, 0, 0, 5)
