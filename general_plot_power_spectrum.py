@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 
 # Plots the power spectra of TT, EE, and BB of a segment of given size of a given simulated PySM sky
 # Assumes segment is small enough to be assumed as rectangular
-def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius_degrees):
+def show_power_spectra_small(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius_degrees):
 
     # making the shape so I can take a piece out of the sky without looking at the whole sky
     shape, wcs = enmap.geometry(
@@ -69,6 +69,15 @@ def show_power_spectra(sky, f_GHz, ra_center_degrees, dec_center_degrees, radius
     plt.close()
 
 # testing it out with sky with d0 dust and CMB
-sky = pysm3.Sky(nside=512, preset_strings=["d0", "c1"])
+sky = pysm3.Sky(nside=512, preset_strings=["c1"])
 # r = 1 was too small, I think, it led to a 9x9 map lol
-show_power_spectra(sky, 100, 0, 0, 5)
+show_power_spectra_small(sky, 100, 0, 0, 5)
+
+'''
+Checklist for moving forward:
+1) Move to Pixell for generating CMB
+2) Fix w2
+3) keep everything spherical
+4) 
+
+'''
