@@ -11,12 +11,27 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
+from plot_power_spectrum import plot_ps
+
 # get power spectra .txt
 ps_url = "https://irsa.ipac.caltech.edu/data/Planck/release_3/ancillary-data/cosmoparams/COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt"
 urllib.request.urlretrieve(ps_url, "ps.txt")
 
-# set up randomly generated alm using power spectrum from the txt file
-ps = powspec.read_spectrum("ps.txt", inds=True, scale=True, expand='diag')
+raw = np.loadtxt("ps.txt").T  # shape (ncols, nrows)
+# columns are: ell, TT, TE, EE, BB, PP
+ell = raw[0].astype(int)
+lmax_file = ell[-1]
+
+ps = np.zeros((3, 3, lmax_file + 1))
+
+# scale factor: 2pi / l(l+1), same as what read_spectrum does with scale=True
+scale = np.zeros(lmax_file + 1)
+scale[ell] = 2 * np.pi / (ell * (ell + 1))
+
+ps[0, 0, ell] = raw[1] * scale[ell]  # TT
+ps[1, 1, ell] = raw[3] * scale[ell]  # EE
+ps[2, 2, ell] = raw[4] * scale[ell]  # BB
+
 # just checked, uses np seeds under hood, 67 is a valid seed!!!  Hooray!!!
 gen_seed = 67
 lmax = 5000
@@ -46,76 +61,6 @@ for i in range(3):
     print(f"Saved my_plot_{stokes[i]}.png")
 '''
 
-# works for input of imap xor alms
-def plot_power_spectrum(imap=None, alms=None, name=None):
-    '''
-    given an imap xor alms, saves a png of the power spectrum.
-
-    imap: if given an imap of shape (3, _, _), apodizes, calculates cl, l, and w2, and then plots the 
-    power specturm
-
-    alms: if given alms of shape (3, _), calculates cl and l and then plots the power spectrum
-
-    if neither imap nor alms is inputted, prints error message.  if both imap and alms is inputted, 
-    prints different error message.
-
-    returns nothing, but saves plots to png
-    '''
-    if (imap is not None and alms is not None):
-        print("one of either imap or alms must be None, can't input both")
-    
-    # imap given
-    elif(imap is not None):
-        # apodize
-        tapered_map = imap.copy()
-        apod_width = max(5, shape[1] // 8)
-        taper_mask = enmap.apod(enmap.ones(imap[0].shape, imap[0].wcs), width=apod_width)
-
-        # w2 calculation taken DIRECTLY from spherical harmonics notebook this time.
-        w2 = np.sum(taper_mask.pixsizemap() * taper_mask**2) / (4*np.pi)
-        for i in range(3):
-            tapered_map[i] = taper_mask * imap[i]
-
-        calc_alms = curvedsky.map2alm(tapered_map, lmax=lmax)
-        cl = curvedsky.alm2cl(calc_alms) / w2
-        l = np.arange(cl.shape[1])
-
-        # plot
-        for i in range(3):
-            plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-4, 1e4)
-        plt.legend()
-        
-        if name is None:
-            plt.savefig("power_spectra.png", dpi=150, bbox_inches="tight")
-        else:
-            plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
-        plt.close()
-    
-    # alms given
-    elif(alms is not None):
-        cl = curvedsky.alm2cl(alms)
-        l = np.arange(cl.shape[1])
-
-        # plot
-        for i in range(3):
-            plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-4, 1e4)
-        plt.legend()
-
-        if name is None:
-            plt.savefig("power_spectra.png", dpi=150, bbox_inches="tight")
-        else:
-            plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
-        plt.close()
-
-    else:
-        print("one of either imap or alms must be inputted, can't leave both blank")
-
 # if everything works, these two should be the same
-plot_power_spectrum(imap=gen_map, name="power_spectrum_from_map")
-plot_power_spectrum(alms=gen_alms, name="power_spectrum_directly_from_alm")
-
-
-
-# note to self-- what frequency am I seeing here with the CMB map?
+plot_ps(imap=gen_map, name="power_spectrum_from_map", lmax=5000)
+plot_ps(alms=gen_alms, name="power_spectrum_directly_from_alm", lmax=5000)
