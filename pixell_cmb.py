@@ -13,55 +13,62 @@ warnings.filterwarnings("ignore")
 
 from plot_power_spectrum import plot_ps
 
-# get power spectra .txt
-ps_url = "https://irsa.ipac.caltech.edu/data/Planck/release_3/ancillary-data/cosmoparams/COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt"
-urllib.request.urlretrieve(ps_url, "ps.txt")
+def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1):
+    '''
+    dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
+    is 90, corresponding to fullsky.
 
-raw = np.loadtxt("ps.txt").T  # shape (ncols, nrows)
-# columns are: ell, TT, TE, EE, BB, PP
-ell = raw[0].astype(int)
-lmax_file = ell[-1]
+    ra_radius: the radius of the right ascension in degrees, equivalently 0.5 * the ra dimension.
+    Default is 180, corresponding to fullsky.
 
-ps = np.zeros((3, 3, lmax_file + 1))
+    ps_txt_filepath: filepath to go to for rand_alm calculations.  Default is the ps.text file I 
+    already have in folder, from "https://irsa.ipac.caltech.edu/data/Planck/release_3/ancillary-data/cosmoparams/COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt"
 
-# scale factor: 2pi / l(l+1), same as what read_spectrum does with scale=True
-scale = np.zeros(lmax_file + 1)
-scale[ell] = 2 * np.pi / (ell * (ell + 1))
+    seed: integer value to kickstart rand_alm and rand_map, for reproducability and whatnot.  Default
+    is None.
 
-ps[0, 0, ell] = raw[1] * scale[ell]  
-ps[1, 1, ell] = raw[3] * scale[ell] 
-ps[2, 2, ell] = raw[4] * scale[ell] 
+    res: resolution in arcmin per pixel.  Default is 1.
 
-# just checked, uses np seeds under hood, 67 is a valid seed!!!  Hooray!!!
-gen_seed = 67
-lmax = 1080
-gen_alms = curvedsky.rand_alm(ps=ps, seed=gen_seed, lmax=lmax)
+    returns a tuple containing a simulated CMB map made using Pixell and a boolean representing if the
+    map is flat (True) or not (False).
+    '''
 
-# set up map used solely for shape, taken from map manipulation notebook
-# adjust res as necessary, higher res is lower resolution
-res = 10
-box = np.array([[-90, 180], [90, -180]]) * utils.degree
-shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
-shape_map = enmap.zeros((3,) + shape, wcs=wcs)
+    raw = np.loadtxt(ps_txt_filepath).T
+    # columns are: ell, TT, TE, EE, BB, PP
+    ell = raw[0].astype(int)
+    lmax_file = ell[-1]
 
-# generate the map from random alm
-gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
-print(gen_map.shape)
+    ps = np.zeros((3, 3, lmax_file + 1))
 
-# enplot was being buggy, so I clauded a fix with Matplotlib, gonna comment out for rn tho
-'''
-stokes = ['I', 'Q', 'U']
-for i in range(3):
-    fig, ax = plt.subplots(figsize=(10, 5))
-    im = ax.imshow(gen_map[i], origin='lower', cmap='RdBu_r')
-    ax.set_title(f'Stokes {stokes[i]}')
-    plt.colorbar(im, ax=ax)
-    plt.tight_layout()
-    plt.savefig(f'my_plot_{stokes[i]}.png', dpi=150)
-    plt.close()
-    print(f"Saved my_plot_{stokes[i]}.png")
-'''
+    # scale factor: 2pi / l(l+1), same as what read_spectrum does with scale=True
+    scale = np.zeros(lmax_file + 1)
+    scale[ell] = 2 * np.pi / (ell * (ell + 1))
 
-# if everything works, these two should be the same
-plot_ps(imap=gen_map, name="power_spectrum_from_map", lmax=1080, fullsky=True)
-plot_ps(alms=gen_alms, name="power_spectrum_directly_from_alm", lmax=1080, fullsky=True)
+    ps[0, 0, ell] = raw[1] * scale[ell]  
+    ps[1, 1, ell] = raw[3] * scale[ell] 
+    ps[2, 2, ell] = raw[4] * scale[ell] 
+
+    # geometry nonsense
+    box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
+    shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
+
+    # this threshold is assuming that the sky is centered at (0,0) otherwise RA distorted?
+    DEC_THRESHOLD = 10
+    RA_THRESHOLD = 10
+
+    if dec_radius < DEC_THRESHOLD and ra_radius < RA_THRESHOLD:
+        flat_bool = True
+
+        gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps)
+
+    else:
+        flat_bool = False
+
+        shape_map = enmap.zeros((3,) + shape, wcs=wcs)
+        # lmax is either one ell per pixell or 4000 ells, whichever is lower
+        lmax = min(min(shape), 4000)
+
+        gen_alms = curvedsky.rand_alm(ps=ps, seed=gen_seed, lmax=lmax)
+        gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
+    
+    return gen_map, flat_bool
