@@ -28,24 +28,25 @@ ps = np.zeros((3, 3, lmax_file + 1))
 scale = np.zeros(lmax_file + 1)
 scale[ell] = 2 * np.pi / (ell * (ell + 1))
 
-ps[0, 0, ell] = raw[1] * scale[ell]  # TT
-ps[1, 1, ell] = raw[3] * scale[ell]  # EE
-ps[2, 2, ell] = raw[4] * scale[ell]  # BB
+ps[0, 0, ell] = raw[1] * scale[ell]  
+ps[1, 1, ell] = raw[3] * scale[ell] 
+ps[2, 2, ell] = raw[4] * scale[ell] 
 
 # just checked, uses np seeds under hood, 67 is a valid seed!!!  Hooray!!!
 gen_seed = 67
-lmax = 5000
+lmax = 1080
 gen_alms = curvedsky.rand_alm(ps=ps, seed=gen_seed, lmax=lmax)
 
 # set up map used solely for shape, taken from map manipulation notebook
 # adjust res as necessary, higher res is lower resolution
-res = 1
-box = np.array([[-25, 25], [25, -25]]) * utils.degree
+res = 10
+box = np.array([[-90, 180], [90, -180]]) * utils.degree
 shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
 shape_map = enmap.zeros((3,) + shape, wcs=wcs)
 
 # generate the map from random alm
 gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
+print(gen_map.shape)
 
 # enplot was being buggy, so I clauded a fix with Matplotlib, gonna comment out for rn tho
 '''
@@ -62,5 +63,5 @@ for i in range(3):
 '''
 
 # if everything works, these two should be the same
-plot_ps(imap=gen_map, name="power_spectrum_from_map", lmax=5000)
-plot_ps(alms=gen_alms, name="power_spectrum_directly_from_alm", lmax=5000)
+plot_ps(imap=gen_map, name="power_spectrum_from_map", lmax=1080, fullsky=True)
+plot_ps(alms=gen_alms, name="power_spectrum_directly_from_alm", lmax=1080, fullsky=True)

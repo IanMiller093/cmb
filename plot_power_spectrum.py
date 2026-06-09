@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000):
+def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000, fullsky=False):
     '''
     given an imap xor alms, saves a png of the power spectrum.
 
@@ -26,15 +26,18 @@ def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000):
     
     # imap given
     elif(imap is not None):
-        # apodize
+        # initialize in case of the fullsky case
         tapered_map = imap.copy()
-        apod_width = max(5, imap[0].shape[1] // 8)
-        taper_mask = enmap.apod(enmap.ones(imap[0].shape, imap[0].wcs), width=apod_width)
+        w2 = 1
 
-        # w2 calculation taken DIRECTLY from spherical harmonics notebook this time.
-        w2 = np.sum(taper_mask.pixsizemap() * taper_mask**2) / (4*np.pi)
-        for i in range(3):
-            tapered_map[i] = taper_mask * imap[i]
+        if not fullsky:
+            apod_width = max(5, imap[0].shape[1] // 8)
+            taper_mask = enmap.apod(enmap.ones(imap[0].shape, imap[0].wcs), width=apod_width)
+
+            # w2 calculation taken DIRECTLY from spherical harmonics notebook this time.
+            w2 = np.sum(taper_mask.pixsizemap() * taper_mask**2) / (4*np.pi)
+            for i in range(3):
+                tapered_map[i] = taper_mask * imap[i]
 
         calc_alms = curvedsky.map2alm(tapered_map, lmax=lmax, spin=[0, 2])
         cl = curvedsky.alm2cl(calc_alms) / w2
@@ -43,7 +46,7 @@ def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000):
         # plot
         for i in range(3):
             plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-4, 1e4)
+        plt.ylim(1e-8, 1e4)
         plt.legend()
     
         plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
@@ -57,7 +60,7 @@ def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000):
         # plot
         for i in range(3):
             plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-4, 1e4)
+        plt.ylim(1e-8, 1e4)
         plt.legend()
 
         plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
