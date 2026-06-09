@@ -72,14 +72,12 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
         # lmax is either one ell per pixell or 4000 ells, whichever is lower
         lmax = min(min(shape), 4000)
 
-        gen_alms = curvedsky.rand_alm(ps=ps, seed=gen_seed, lmax=lmax)
-        gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
+        gen_alms = curvedsky.rand_alm(ps=ps, seed=seed, lmax=lmax)
 
         if beam:
-            alms = curvedsky.map2alm(gen_map, lmax=lmax)
             beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
-            alms = curvedsky.almxfl(alms, beam_ell)
-            beamed_map = curvedsky.alm2map(alm=alms, map=gen_map, copy=True)
-            gen_map = beamed_map
+            gen_alms = curvedsky.almxfl(gen_alms, beam_ell)
+
+        gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
     
     return gen_map, flat_bool
