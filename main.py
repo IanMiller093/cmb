@@ -1,23 +1,21 @@
 from pixell_cmb import make_cmb
 from pysm_foreground import make_foreground
 from cmb_and_foreground import make_cmb_and_foreground
-from matplotlib import pyplot as plt
 from plot_power_spectrum import plot_ps
+from plot_rectangular_map import plot_rect_map
 
 # get sim
-#imap = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], gaussian_noise=True)
-imap = make_foreground(dec_radius=4, ra_radius=8, sky_f=150, res=5, foreground_components=["d0"], gaussian_noise=True, fwhm=1)
+full_b_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True)
+dust_b_map = make_foreground(dec_radius=4, ra_radius=8, sky_f=150, res=5, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=True)
+full_nb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=False)
+dust_nb_map = make_foreground(dec_radius=4, ra_radius=8, sky_f=150, res=5, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=False)
 
-# plot
-stokes = ['I', 'Q', 'U']
-for i in range(3):
-    fig, ax = plt.subplots(figsize=(10, 5))
-    im = ax.imshow(imap[i], origin='lower', cmap='RdBu_r')
-    ax.set_title(f'Stokes {stokes[i]}')
-    plt.colorbar(im, ax=ax)
-    plt.tight_layout()
-    plt.savefig(f'dust_{stokes[i]}_beam.png', dpi=150)
-    plt.close()
-    print(f"Saved dust_{stokes[i]}_beam.png")
+plot_ps(imap=full_b_map, name="full_sim_beam_ps", lmax=min(full_b_map.shape[1:3]), fullsky=False)
+plot_ps(imap=full_nb_map, name="full_sim_no_beam_ps", lmax=min(full_nb_map.shape[1:3]), fullsky=False)
+plot_ps(imap=dust_b_map, name="dust_beam_ps", lmax=min(dust_b_map.shape[1:3]), fullsky=False)
+plot_ps(imap=dust_nb_map, name="dust_no_beam_ps", lmax=min(dust_nb_map.shape[1:3]), fullsky=False)
 
-plot_ps(imap=imap, name="dust_ps_beam", lmax=min(imap.shape[1:3]), fullsky=False)
+plot_rect_map(imap=full_b_map, name="full_sim_beam")
+plot_rect_map(imap=full_nb_map, name="full_sim_no_beam_ps")
+plot_rect_map(imap=dust_b_map, name="dust_beam_ps")
+plot_rect_map(imap=dust_nb_map, name="dust_no_beam_ps")

@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 from plot_power_spectrum import plot_ps
 
-def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], gaussian_noise=True, fwhm=1):
+def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=True):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -51,11 +51,12 @@ def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_c
         noise = enmap.rand_gauss(shape, wcs) * np.sqrt(1/ivar)
         foreground_map += noise
 
-    lmax = min(min(shape[1:]), 6000)
-    alms = curvedsky.map2alm(foreground_map, lmax=lmax)
-    beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
-    curvedsky.almxfl(alms, beam_ell)
-    beamed_map = curvedsky.alm2map(alm=alms, map=foreground_map, copy=True)
-    foreground_map = beamed_map
+    if beam:
+        lmax = min(min(shape[1:]), 6000)
+        alms = curvedsky.map2alm(foreground_map, lmax=lmax)
+        beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
+        alms = curvedsky.almxfl(alms, beam_ell)
+        beamed_map = curvedsky.alm2map(alm=alms, map=foreground_map, copy=True)
+        foreground_map = beamed_map
     
     return foreground_map
