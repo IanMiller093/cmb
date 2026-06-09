@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 from plot_power_spectrum import plot_ps
 
-def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1):
+def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1, fwhm=1):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -60,6 +60,7 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
         flat_bool = True
 
         gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps)
+        beamed_map = enmap.smooth_gauss(gen_map, fwhm * utils.arcmin / (8*np.log(2))**0.5)
 
     else:
         flat_bool = False
@@ -70,5 +71,9 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
 
         gen_alms = curvedsky.rand_alm(ps=ps, seed=gen_seed, lmax=lmax)
         gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
+        alms = curvedsky.map2alm(beamed_map, lmax=lmax)
+        beam_ell = hp.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T
+        curvedsky.almxfl(alms, beam_ell, inplace=True)
+        beamed_map = curvedsky.alm2map(alms, enmap.zeros_like(gen_map))
     
-    return gen_map, flat_bool
+    return beamed_map, flat_bool
