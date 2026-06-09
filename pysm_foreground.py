@@ -51,9 +51,11 @@ def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_c
         noise = enmap.rand_gauss(shape, wcs) * np.sqrt(1/ivar)
         foreground_map += noise
 
+    lmax = min(min(shape[1:]), 6000)
     alms = curvedsky.map2alm(foreground_map, lmax=lmax)
-    beam_ell = hp.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T
-    curvedsky.almxfl(alms, beam_ell, inplace=True)
-    beamed_map = curvedsky.alm2map(alms, enmap.zeros_like(foreground_map))
+    beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
+    curvedsky.almxfl(alms, beam_ell)
+    beamed_map = curvedsky.alm2map(alm=alms, map=foreground_map, copy=True)
+    foreground_map = beamed_map
     
-    return beamed_map
+    return foreground_map

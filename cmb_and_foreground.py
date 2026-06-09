@@ -1,5 +1,5 @@
 from pixell_cmb import make_cmb
-from cmb_and_dust import make_foreground
+from pysm_foreground import make_foreground
 
 def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, fwhm=1):
     '''
