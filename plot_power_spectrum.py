@@ -46,7 +46,7 @@ def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000, fullsky=False
         # plot
         for i in range(3):
             plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-8, 1e4)
+        plt.ylim(1e-4, 1e8)
         plt.legend()
     
         plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
@@ -60,7 +60,7 @@ def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000, fullsky=False
         # plot
         for i in range(3):
             plt.semilogy(l, cl[i] * l *(l+1) / 2 / np.pi, label=['TT', 'EE', 'BB'][i])
-        plt.ylim(1e-8, 1e4)
+        plt.ylim(1e-4, 1e8)
         plt.legend()
 
         plt.savefig(name + ".png", dpi=150, bbox_inches="tight")
