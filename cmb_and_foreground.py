@@ -10,8 +10,10 @@ def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.tx
     returns make_cmb + make_foreground with the same dimensions
     '''
     cmb, _ = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, ps_txt_filepath=ps_txt_filepath, seed=seed, res=res, fwhm=fwhm, beam=beam)
-    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, gaussian_noise=gaussian_noise, fwhm=fwhm, beam=beam)
-
+    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, fwhm=fwhm, beam=beam)
     assert cmb.shape == foreground.shape
+
+    if gaussian_noise:
+        return cmb + foreground + make_noise(dec_radius, ra_radius, res)
 
     return cmb + foreground

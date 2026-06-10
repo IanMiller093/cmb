@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 from plot_power_spectrum import plot_ps
 
-def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=True):
+def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], fwhm=1, beam=True):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -43,13 +43,6 @@ def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_c
     foreground_sky = pysm3.Sky(nside=sky_nside, preset_strings=foreground_components)
     hp_map = foreground_sky.get_emission(sky_f * u.GHz)
     foreground_map = reproject.healpix2map(hp_map, shape, wcs)
-
-    # taken from matched filtering Pixell notebook
-    if gaussian_noise:
-        pixarea = enmap.pixsizemap(shape, wcs)
-        ivar = 10**-2*pixarea/utils.arcmin**2
-        noise = enmap.rand_gauss(shape, wcs) * np.sqrt(1/ivar)
-        foreground_map += noise
 
     if beam:
         lmax = min(min(shape[1:]), 6000)
