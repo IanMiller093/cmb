@@ -69,8 +69,7 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
         flat_bool = False
 
         shape_map = enmap.zeros((3,) + shape, wcs=wcs)
-        # lmax is either one ell per pixell or 4000 ells, whichever is lower
-        lmax = min(min(shape), 4000)
+        lmax = 2160
 
         gen_alms = curvedsky.rand_alm(ps=ps, seed=seed, lmax=lmax)
 
