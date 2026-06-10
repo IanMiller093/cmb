@@ -1,7 +1,7 @@
 import numpy as np
 from pixell import enmap, utils
 
-def make_noise(dec_radius=90, ra_radius=180, res=1, beam=True, fwhm=1):
+def make_noise(dec_radius=90, ra_radius=180, res=1, beam=True, fwhm=1, flatsky=True):
     box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
     shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
 
@@ -13,10 +13,7 @@ def make_noise(dec_radius=90, ra_radius=180, res=1, beam=True, fwhm=1):
     if not beam:
         return noise
 
-    DEC_THRESHOLD = 10
-    RA_THRESHOLD = 10
-
-    if dec_radius < DEC_THRESHOLD and ra_radius < RA_THRESHOLD:
+    if flatsky:
         beamed_noise = enmap.smooth_gauss(noise, fwhm * utils.arcmin / (8*np.log(2))**0.5)
         
     else:

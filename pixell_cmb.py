@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 from plot_power_spectrum import plot_ps
 
-def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1, fwhm=1, beam=True):
+def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1, fwhm=1, beam=True, flatsky=True):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -52,12 +52,7 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
     box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
     shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
 
-    # this threshold is assuming that the sky is centered at (0,0) otherwise RA distorted?
-    DEC_THRESHOLD = 10
-    RA_THRESHOLD = 10
-
-    if dec_radius < DEC_THRESHOLD and ra_radius < RA_THRESHOLD:
-        flat_bool = True
+    if flatsky:
 
         gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps)
 
@@ -66,7 +61,6 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
             gen_map = beamed_map
 
     else:
-        flat_bool = False
 
         shape_map = enmap.zeros((3,) + shape, wcs=wcs)
         lmax = 2160
@@ -79,4 +73,4 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
 
         gen_map = curvedsky.alm2map(alm=gen_alms, map=shape_map)
     
-    return gen_map, flat_bool
+    return gen_map
