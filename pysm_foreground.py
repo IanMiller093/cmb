@@ -45,9 +45,9 @@ def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_c
     foreground_map = reproject.healpix2map(hp_map, shape, wcs)
 
     if beam:
-        lmax = 2160
-        alms = curvedsky.map2alm(foreground_map, lmax=lmax)
-        beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
+        nyquist_lmax = (60 / res) * 180
+        alms = curvedsky.map2alm(foreground_map, lmax=nyquist_lmax)
+        beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=nyquist_lmax, pol=True).T[:3]
         alms = curvedsky.almxfl(alms, beam_ell)
         beamed_map = curvedsky.alm2map(alm=alms, map=foreground_map, copy=True)
         foreground_map = beamed_map

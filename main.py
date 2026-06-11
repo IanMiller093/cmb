@@ -5,7 +5,6 @@ from pixell_noise import make_noise
 from plot_power_spectrum import plot_ps
 from plot_rectangular_map import plot_rect_map
 
-# get sim
 full_b_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=True, fwhm=5)
 full_nb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=False, fwhm=5)
 

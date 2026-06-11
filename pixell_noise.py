@@ -17,7 +17,9 @@ def make_noise(dec_radius=90, ra_radius=180, res=1, beam=True, fwhm=1, flatsky=T
         beamed_noise = enmap.smooth_gauss(noise, fwhm * utils.arcmin / (8*np.log(2))**0.5)
         
     else:
-        beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=lmax, pol=True).T[:3]
+        nyquist_lmax = (60 / res) * 180
+
+        beam_ell = hp.sphtfunc.gauss_beam(fwhm * utils.arcmin, lmax=nyquist_lmax, pol=True).T[:3]
         gen_alms = curvedsky.almxfl(gen_alms, beam_ell)
         beamed_noise = curvedsky.alm2map(alm=gen_alms, map=shape_map)
 
