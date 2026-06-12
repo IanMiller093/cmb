@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 from plot_power_spectrum import plot_ps
+from bandpass import bandpass
 
-def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], fwhm=1, beam=True, rot=False):
+def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_components=["d0"], fwhm=1, beam=True, rot=False, bp=True, bp_telescope="planck", bp_channel=100, bp_pa=None):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -41,10 +42,22 @@ def make_foreground(dec_radius=90, ra_radius=180, sky_f=150, res=1, foreground_c
     box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
     shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
     foreground_sky = pysm3.Sky(nside=sky_nside, preset_strings=foreground_components)
-    hp_map = foreground_sky.get_emission(sky_f * u.GHz)
+    
+    if bp:
+        bp_freqs, bp_weights = bandpass(telescope=bp_telescope, channel=bp_channel, pa=bp_pa)
+
+        mask = bp_freqs > 0
+
+        bp_freqs = bp_freqs[mask]
+        bp_weights = bp_weights[mask]
+
+        hp_map = foreground_sky.get_emission(bp_freqs * u.GHz, bp_weights)
+    else:
+        hp_map = foreground_sky.get_emission(sky_f * u.GHz)
 
     if rot:
         foreground_map = reproject.healpix2map(hp_map, shape, wcs, rot="gal,cel")
+
     else:
         foreground_map = reproject.healpix2map(hp_map, shape, wcs)
 

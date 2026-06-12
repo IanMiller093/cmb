@@ -2,7 +2,7 @@ from pixell_cmb import make_cmb
 from pysm_foreground import make_foreground
 from pixell_noise import make_noise
 
-def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=True, rot=False):
+def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, fwhm=1, beam=True, rot=False, bp=True, bp_telescope="planck", bp_channel=100, bp_pa=None):
     '''
     pretty much just a wrapper of make_cmb and make_foreground.  I'm too lazy to copy over the comments
     about params from the other files, and the fishies would get mad at me if I used Claude to grab the
@@ -10,8 +10,9 @@ def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.tx
 
     returns make_cmb + make_foreground with the same dimensions
     '''
+
     cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, ps_txt_filepath=ps_txt_filepath, seed=seed, res=res, fwhm=fwhm, beam=beam)
-    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, fwhm=fwhm, beam=beam, rot=rot)
+    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, fwhm=fwhm, beam=beam, rot=rot, bp=bp, bp_telescope=bp_telescope, bp_channel=bp_channel, bp_pa=bp_pa)
     assert cmb.shape == foreground.shape
 
     if gaussian_noise:
