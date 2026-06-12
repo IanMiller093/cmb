@@ -23,7 +23,18 @@ def plot_2d_ps(imap, name="power_spectra_2d", fullsky=False):
     cl = enmap.calc_ps2d(harm[:, None], harm[None, :])
 
     for i in range(3):
-        plt.imshow(np.log(cl[i, i]), origin="lower")
+        # clauded conversion to get the axes in the middle
+        ny, nx = cl[i, i].shape
+        
+        lx = np.fft.fftfreq(nx, d=1.0/nx)
+        ly = np.fft.fftfreq(ny, d=1.0/ny)
+
+        lx_shift = np.fft.fftshift(lx)
+        ly_shift = np.fft.fftshift(ly)
+
+        extent = [lx_shift[0], lx_shift[-1], ly_shift[0], ly_shift[-1]]
+        
+        plt.imshow(np.log(enmap.fftshift(cl[i, i])), origin="lower", extent=extent)
         plt.colorbar(label="log(power)")
         plt.title(['TT', 'EE', 'BB'][i])
 
