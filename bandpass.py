@@ -70,7 +70,7 @@ def bandpass(telescope="planck", channel=100, pa=None):
         bp_freqs = bandpass["frequencies"][:]
         bp_weights = bandpass["mean_band"][:]
 
-        low, high = band["integration_bounds"][:]
+        low, high = bandpass["integration_bounds"][:]
 
         mask = (bp_freqs >= low) & (bp_freqs <= high)
         bp_freqs = bp_freqs[mask]

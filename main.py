@@ -24,10 +24,30 @@ from concurrent.futures import ProcessPoolExecutor
 # rotated_full_b_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=True, fwhm=5, rot=True)
 # rotated_full_nb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=False, fwhm=5, rot=True)
 
+def make_and_plot_planck():
+    m = make_foreground(
+        dec_radius=4, ra_radius=8, sky_f=150, res=20,
+        foreground_components=["d0"], fwhm=20, beam=True,
+        rot=True, bp=True, bp_telescope="planck",
+        bp_channel=100, bp_pa=None
+    )
+    plot_rect_map(m, "image_outputs/planck_bp_rotated_dust_beam")
+    return m
 
-with ProcessPoolExecutor(max_workers=4) as executor:
-    planck_bp_foreground_map = make_foreground(dec_radius=4, ra_radius=8, sky_f=150, res=10, foreground_components=["d0"], fwhm=10, beam=True, rot=True, bp=True, bp_telescope="planck", bp_channel=100, bp_pa=None)
-    act_bp_foreground_map = make_foreground(dec_radius=4, ra_radius=8, sky_f=150, res=10, foreground_components=["d0"], fwhm=10, beam=True, rot=True, bp=True, bp_telescope="act", bp_channel=150, bp_pa=5)
+def make_and_plot_act():
+    m = make_foreground(
+        dec_radius=4, ra_radius=8, sky_f=150, res=20,
+        foreground_components=["d0"], fwhm=20, beam=True,
+        rot=True, bp=True, bp_telescope="act",
+        bp_channel=150, bp_pa=5
+    )
+    plot_rect_map(m, "image_outputs/act_bp_rotated_dust_beam")
+    return m
 
-    plot_rect_map(planck_bp_foreground_map, "image_outputs/planck_bp_rotated_dust_beam")
-    plot_rect_map(act_bp_foreground_map, "image_outputs/act_bp_rotated_dust_beam")
+if __name__ == "__main__":  # required for ProcessPoolExecutor on most OSes
+    with ProcessPoolExecutor(max_workers=2) as executor:
+        fut_planck = executor.submit(make_and_plot_planck)
+        fut_act    = executor.submit(make_and_plot_act)
+
+        planck_bp_foreground_map = fut_planck.result()  # blocks until done
+        act_bp_foreground_map    = fut_act.result()
