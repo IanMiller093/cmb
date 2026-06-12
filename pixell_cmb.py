@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore")
 
 from plot_power_spectrum import plot_ps
 
-def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, res=1, fwhm=1, beam=True, flatsky=True):
+def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, fwhm=1, beam=True, flatsky=True):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
@@ -54,7 +54,7 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=None, 
 
     if flatsky:
 
-        gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps)
+        gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps, seed=seed)
 
         if beam:
             beamed_map = enmap.smooth_gauss(gen_map, fwhm * utils.arcmin / (8*np.log(2))**0.5)
