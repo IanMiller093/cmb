@@ -51,7 +51,7 @@ def load_act_beam(channel, lmax, pa, beam_type="jitter_cmb", split="coadd"):
 
 
 
-def apply_planck_beam(imap, lmax, channel):
+def apply_planck_beam(imap=None, alms=None, lmax=5000, channel=143):
     beam_ell = load_planck_beam(channel, lmax)
 
     if alms is None:
@@ -60,17 +60,16 @@ def apply_planck_beam(imap, lmax, channel):
     return curvedsky.alm2map(alms, imap.copy())
 
 
-def apply_act_beam(imap=None, alms=None, lmax, pa, channel, beam_type="jitter_cmb", split="coadd"):
-    eam_ell = load_act_beam(pa, channel, lmax, beam_type, split)
+def apply_act_beam(imap=None, alms=None, lmax=5000, pa=5, channel=150, beam_type="jitter_cmb", split="coadd"):
+    beam_ell = load_act_beam(channel=channel, lmax=lmax, pa=pa, beam_type=beam_type, split=split)
 
     if alms is None:
         alms = curvedsky.map2alm(imap, lmax=lmax)
     alms = curvedsky.almxfl(alms, beam_ell)
     return curvedsky.alm2map(alms, imap.copy())
 
-def apply_beam(imap=None, alms=None, lmax, nside, telescope="planck", channel=100, pa=5, beam_type="jitter_cmb", split="coadd"):
+def apply_beam(imap=None, alms=None, lmax=5000, telescope="planck", channel=100, pa=5, beam_type="jitter_cmb", split="coadd"):
     assert telescope in ["planck", "act"]
-    assert imap is None ^ alms is None
 
     if imap is not None:
         if (telescope == "planck"):

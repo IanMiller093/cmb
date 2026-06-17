@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 
 from plot_power_spectrum import plot_ps
 
-def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, fwhm=1, beam=True, beam_telescope="planck", beam_channel=100, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd"):
+def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, beam=True, beam_telescope="planck", beam_channel=100, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd"):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.

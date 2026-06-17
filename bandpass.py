@@ -47,7 +47,7 @@ def bandpass(telescope="planck", channel=100, pa=None):
 
 
     elif telescope == "act":
-        file = h5py.File("AdvACT_passbands.h5")
+        file = h5py.File("AdvACT_Passbands.h5")
         
         channels_w_pas = [(150, 4), (220, 4), (90, 5), (150, 5), (90, 6), (150, 6), (30, 7), (40, 7)]
         default_pas = {

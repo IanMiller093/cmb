@@ -1,7 +1,7 @@
 import numpy as np
 from pixell import enmap, utils
 
-def make_noise(dec_radius=90, ra_radius=180, res=1, fwhm=1, flatsky=True):
+def make_noise(dec_radius=90, ra_radius=180, res=1, flatsky=True):
     box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
     shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
 
