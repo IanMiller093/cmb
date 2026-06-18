@@ -10,8 +10,6 @@
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export NUMBA_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-source ~/ENTER/etc/profile.d/conda.sh
-conda activate cmb
-cd ~/PySM_Stuff
+source /home3/miller42/projects/cmb_component_separation/.venv/bin/activate
 
 "$@"

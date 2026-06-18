@@ -10,7 +10,8 @@ from bandpass import bandpass
 from concurrent.futures import ProcessPoolExecutor
 from plot_bandpass_fn import plot_bandpass
 from act_planck_beam import apply_beam
-from plot_beam_fn import plot_beams
+
+IMG_OUT_PATH = "/data6/miller42/cmb_sim/image_outputs/"
 
 # full_b_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=True, fwhm=5)
 # full_nb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=False, fwhm=5)
@@ -27,20 +28,4 @@ from plot_beam_fn import plot_beams
 # rotated_full_b_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=True, fwhm=5, rot=True)
 # rotated_full_nb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=5, sky_f=150, foreground_components=["d0"], beam=False, fwhm=5, rot=True)
 
-planck_full_sim_rotated_bb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=True, bp=True, bb_telescope="planck", bb_channel=143, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd")
-act_full_sim_rotated_bb_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=True, bp=True, bb_telescope="act", bb_channel=150, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd")
-
-# plot_rect_map(planck_full_sim_rotated_bb_map, "image_outputs/beam_bp_planck_rotated_full_sim_map")
-# plot_rect_map(act_full_sim_rotated_bb_map, "image_outputs/beam_bp_act_rotated_full_sim_map")
-
-plot_ps_compare(
-    planck_full_sim_rotated_bb_map,
-    act_full_sim_rotated_bb_map,
-    name="image_outputs/beam_bp_act_planck_ps_comparison",
-    fullsky=False,
-    map1_label="Planck",
-    map2_label="ACT",
-    lmax=5000,
-    title="Planck vs ACT Power Spectra Comparison"
-)
-
+full_sim_non_beamed_noise_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=True, bp=True, bb_telescope="act", bb_channel=150, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd")

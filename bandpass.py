@@ -25,7 +25,7 @@ def bandpass(telescope="planck", channel=100, pa=None):
         assert channel in lfis or channel in hfis
 
         if channel in hfis:
-            hdul = fits.open("HFI_RIMO_R3.00.fits")
+            hdul = fits.open("/data6/miller42/cmb_sim/data_files_and_folders/HFI_RIMO_R3.00.fits")
             bandpass = hdul["BANDPASS_F" + str(channel)].data
             # GHz conversion
             bp_freqs = bandpass["WAVENUMBER"] * 29.9792458
@@ -35,7 +35,7 @@ def bandpass(telescope="planck", channel=100, pa=None):
             bp_weights = bp_weights[mask]
 
         else:
-            hdul = fits.open("LFI_RIMO_R3.31.fits")
+            hdul = fits.open("/data6/miller42/cmb_sim/data_files_and_folders/LFI_RIMO_R3.31.fits")
             bandpass = hdul["BANDPASS_" + str(channel).zfill(3)].data
             bp_freqs = bandpass["WAVENUMBER"]
             bp_weights = bandpass["TRANSMISSION"]
@@ -47,7 +47,7 @@ def bandpass(telescope="planck", channel=100, pa=None):
 
 
     elif telescope == "act":
-        file = h5py.File("AdvACT_Passbands.h5")
+        file = h5py.File("/data6/miller42/cmb_sim/data_files_and_folders/AdvACT_Passbands.h5")
         
         channels_w_pas = [(150, 4), (220, 4), (90, 5), (150, 5), (90, 6), (150, 6), (30, 7), (40, 7)]
         default_pas = {

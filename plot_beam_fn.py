@@ -5,7 +5,7 @@ from act_planck_beam import load_planck_beam, load_act_beam
 
 def plot_beams(lmax=5000, planck_channels=(100, 143, 217), act_channels=(90, 150),
                 act_pas=None, beam_type="jitter_cmb", split="coadd",
-                logy=True, savepath="beams.png"):
+                logy=True, savepath="/data6/miller42/cmb_sim/image_outputs/beams.png"):
 
     ell = np.arange(lmax + 1)
     fig, ax = plt.subplots(figsize=(8, 6))

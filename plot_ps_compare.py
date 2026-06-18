@@ -49,7 +49,7 @@ def _get_cl(imap, lmax=5000, fullsky=False):
 def plot_ps_compare(
     imap1,
     imap2,
-    name="power_spectra_comparison",
+    name="/data6/miller42/cmb_sim/image_outputs/power_spectra_comparison",
     fullsky=False,
     map1_label="Map 1",
     map2_label="Map 2",

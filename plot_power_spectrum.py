@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
-def plot_ps(imap=None, alms=None, name="power_spectra", lmax=5000, fullsky=False):
+def plot_ps(imap=None, alms=None, name="/data6/miller42/cmb_sim/image_outputs/power_spectra", lmax=5000, fullsky=False):
     '''
     given an imap xor alms, saves a png of the power spectrum.
 

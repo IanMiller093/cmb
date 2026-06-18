@@ -5,7 +5,7 @@ import healpy as hp
 
 
 def load_planck_beam(channel, lmax):
-    filepath = "BeamWf_HFI_R3.01/Bl_T_R3.01_fullsky_" + str(channel) + "evenx" + str(channel) + "even.fits"
+    filepath = "/data6/miller42/cmb_sim/data_files_and_folders/BeamWf_HFI_R3.01/Bl_T_R3.01_fullsky_" + str(channel) + "evenx" + str(channel) + "even.fits"
     
     with fits.open(filepath) as f:
         binary_data  = f[1].data
@@ -36,7 +36,7 @@ def load_act_beam(channel, lmax, pa, beam_type="jitter_cmb", split="coadd"):
     if pa is None:
         pa = default_pas[channel]
     
-    filepath = "act_dr6.02_main_beams/main_beams/nominal/" + split + "_pa" + str(pa) + "_f" + str(channel).zfill(3) + "_night_beam_tform_" + beam_type + ".txt"
+    filepath = "/data6/miller42/cmb_sim/data_files_and_folders/act_dr6.02_main_beams/main_beams/nominal/" + split + "_pa" + str(pa) + "_f" + str(channel).zfill(3) + "_night_beam_tform_" + beam_type + ".txt"
     
     data = np.loadtxt(filepath)
     ell_file = data[:, 0].astype(int)

@@ -24,9 +24,9 @@ def plot_bandpass(telescope="planck", channel=100, pa=None, ax=None, filename=No
     plt.tight_layout()
 
     if filename is None:
-        filename = f"image_outputs/bandpass_{telescope}_{channel}.png"
+        filename = f"/data6/miller42/cmb_sim/image_outputs/bandpass_{telescope}_{channel}.png"
         if telescope == "act" and pa is not None:
-            filename = f"image_outputs/bandpass_{telescope}_{channel}_pa{pa}.png"
+            filename = f"/data6/miller42/cmb_sim/image_outputs/bandpass_{telescope}_{channel}_pa{pa}.png"
 
     plt.savefig(filename, dpi=150, bbox_inches="tight")
     print(f"Saved to {filename}")

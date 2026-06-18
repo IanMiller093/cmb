@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def plot_2d_ps(imap, name="power_spectra_2d", fullsky=False):
+def plot_2d_ps(imap, name="/data6/miller42/cmb_sim/image_outputs/power_spectra_2d", fullsky=False):
 
     tapered_map = imap.copy()
 
