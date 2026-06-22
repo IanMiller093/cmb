@@ -1,6 +1,9 @@
 from matplotlib import pyplot as plt
+import numpy as np
 
 def plot_rect_map(imap, name):
+    if imap.ndim == 2:
+        imap = imap[np.newaxis]
     stokes = ['I', 'Q', 'U']
     for i in range(3):
         fig, ax = plt.subplots(figsize=(10, 5))

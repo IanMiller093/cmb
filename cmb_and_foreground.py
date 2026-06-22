@@ -1,8 +1,9 @@
 from pixell_cmb import make_cmb
 from pysm_foreground import make_foreground
 from pixell_noise import make_noise
+from act_planck_beam import apply_beam
 
-def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=False, bp=True, bb_telescope="planck", bb_channel=100, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd"):
+def make_cmb_and_foreground(dec_radius=90, ra_radius=180, seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=False, bp=True, bb_telescope="planck", bb_channel=100, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd"):
     '''
     pretty much just a wrapper of make_cmb and make_foreground.  I'm too lazy to copy over the comments
     about params from the other files, and the fishies would get mad at me if I used Claude to grab the
@@ -11,11 +12,17 @@ def make_cmb_and_foreground(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.tx
     returns make_cmb + make_foreground with the same dimensions
     '''
 
-    cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, ps_txt_filepath=ps_txt_filepath, seed=seed, res=res, beam=beam, beam_telescope=bb_telescope, beam_channel=bb_channel, beam_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
-    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, beam=beam, rot=rot, bp=bp, bb_telescope=bb_telescope, bb_channel=bb_channel, bb_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
+    cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res, beam=False, beam_telescope=bb_telescope, beam_channel=bb_channel, beam_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
+    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, beam=False, rot=rot, bp=bp, bb_telescope=bb_telescope, bb_channel=bb_channel, bb_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
     assert cmb.shape == foreground.shape
 
-    if gaussian_noise:
-        return cmb + foreground + make_noise(dec_radius, ra_radius, res)
+    if beam:
+        nyquist_lmax = (60 / res) * 180
+        result = apply_beam(imap=(cmb + foreground), lmax=nyquist_lmax, telescope=bb_telescope, channel=bb_channel, pa=bb_pa, beam_type=beam_type, split=beam_split)
+    else:
+        result = cmb + foreground
 
-    return cmb + foreground
+    if gaussian_noise:
+        result += make_noise(dec_radius, ra_radius, res)
+
+    return result

@@ -5,25 +5,65 @@ import healpy as hp
 import numpy as np
 import urllib.request
 from act_planck_beam import apply_beam
-
 from pixell import enmap, reproject, utils, curvedsky, powspec, enplot
 import matplotlib.pyplot as plt
+import camb
 
 import warnings
 warnings.filterwarnings("ignore")
 
-from plot_power_spectrum import plot_ps
+def get_camb_cls(lmax=6000):
+    
+    pars = camb.CAMBparams()
+    pars.set_cosmology(
+        H0=67.5,
+        ombh2=0.022,
+        omch2=0.122,
+        tau=0.06,
+    )
+    pars.InitPower.set_params(As=2e-9, ns=0.965)
+    pars.set_for_lmax(lmax, lens_potential_accuracy=1)
 
-def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, res=1, beam=True, beam_telescope="planck", beam_channel=100, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd"):
+    results = camb.get_results(pars)
+
+    # [TT, EE, BB, TE]
+    powers = results.get_cmb_power_spectra(
+        pars,
+        lmax=lmax,
+        spectra=['lensed_scalar'],
+        CMB_unit='muK',
+        raw_cl=True,
+    )
+
+    cls = powers['lensed_scalar']
+    return cls
+
+from pixell import curvedsky, enmap
+
+def make_cmb_ps_matrix(cls):
+    
+    lmax = cls.shape[0] - 1
+    TT = cls[:, 0]
+    EE = cls[:, 1]
+    BB = cls[:, 2]
+    TE = cls[:, 3]
+
+    ps = np.zeros((3, 3, lmax + 1))
+    ps[0, 0] = TT
+    ps[1, 1] = EE
+    ps[2, 2] = BB
+    ps[0, 1] = TE
+    ps[1, 0] = TE
+
+    return ps
+
+def make_cmb(dec_radius=90, ra_radius=180, seed=67, res=1, beam=True, beam_telescope="planck", beam_channel=100, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd"):
     '''
     dec_radius: the radius of the declination in degrees, equivalently 0.5 * the dec dimension.  Default
     is 90, corresponding to fullsky.
 
     ra_radius: the radius of the right ascension in degrees, equivalently 0.5 * the ra dimension.
     Default is 180, corresponding to fullsky.
-
-    ps_txt_filepath: filepath to go to for rand_alm calculations.  Default is the ps.text file I 
-    already have in folder, from "https://irsa.ipac.caltech.edu/data/Planck/release_3/ancillary-data/cosmoparams/COM_PowerSpect_CMB-base-plikHM-TTTEEE-lowl-lowE-lensing-minimum-theory_R3.01.txt"
 
     seed: integer value to kickstart rand_alm and rand_map, for reproducability and whatnot.  Default
     is None.
@@ -34,26 +74,15 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, re
     map is flat (True) or not (False).
     '''
 
-    raw = np.loadtxt(ps_txt_filepath).T
-    # columns are ell, TT, TE, EE, BB, PP
-    ell = raw[0].astype(int)
-    lmax_file = ell[-1]
+    # for the whole sphere
+    nyquist_lmax = (60 / res) * 180
 
-    ps = np.zeros((3, 3, lmax_file + 1))
-
-    # scale factor: 2pi / l(l+1), same as what read_spectrum does with scale=True
-    scale = np.zeros(lmax_file + 1)
-    scale[ell] = 2 * np.pi / (ell * (ell + 1))
-
-    ps[0, 0, ell] = raw[1] * scale[ell]  
-    ps[1, 1, ell] = raw[3] * scale[ell] 
-    ps[2, 2, ell] = raw[4] * scale[ell] 
+    cls = get_camb_cls(lmax=nyquist_lmax)
+    ps  = make_cmb_ps_matrix(cls)
 
     # geometry nonsense
     box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
     shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
-    # for the whole sphere
-    nyquist_lmax = (60 / res) * 180
 
     if flatsky:
 
@@ -72,5 +101,7 @@ def make_cmb(dec_radius=90, ra_radius=180, ps_txt_filepath="ps.txt", seed=67, re
         if beam:
             beamed_map = apply_beam(imap=None, alms=gen_alms, lmax=nyquist_lmax, telescope=beam_telescope, channel=beam_channel, pa=beam_pa, beam_type=beam_type, split=beam_split)
             gen_map = beamed_map
+        else:
+            gen_map = alm2map(gen_alms)
     
     return gen_map

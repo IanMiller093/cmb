@@ -1,16 +1,90 @@
-def planck_noise(channel, shape, wcs):
+from astropy.io import fits
+import healpy as hp
+import numpy as np
+from pixell import enmap, reproject
 
-    return noise
+PLANCK_DIR_GPC = "/data5/planck/pr3"
+ACT_DIR_GPC = "/data5/act/maps/dr6v4_20230316"
+
+ACT_SETS = [0, 1, 2, 3]
+
+
+def load_planck_noise(channel):
+    ivar_full = None
+
+    for ring in ["evenring", "oddring"]:
+        fname = (
+            f"{PLANCK_DIR_GPC}/HFI_SkyMap_{channel}_2048_R3.01_full-{ring}_ivar.fits"
+        )
+        # Read all 3 Stokes components (T, Q, U)
+        ring_ivar = enmap.read_map(fname)  # shape: (3, ndec, nra)
+        ivar_full = ring_ivar if ivar_full is None else ivar_full + ring_ivar
+
+    ivar_full /= 2.0
+    return ivar_full  # (3, ndec, nra)
+
+
+def load_act_noise(channel, pa):
+    default_pas = {
+        90 : 6,
+        150: 6,
+        220: 4,
+    }
+
+    if pa is None:
+        pa = default_pas[channel]
+
+    ivar = None
+
+    for s in ACT_SETS:
+        fname = (
+            f"{ACT_DIR_GPC}/cmb_night_pa{pa}_f{channel:03d}_3pass_4way_set{s}_ivar.fits"
+        )
+
+        split_ivar = enmap.read_map(fname)  # shape: (3, ndec, nra) or (1, ndec, nra)
+        ivar = split_ivar if ivar is None else ivar + split_ivar
+
+    ivar /= len(ACT_SETS)
+
+    return ivar  # (3, ndec, nra) or (1, ndec, nra)
+
+
+def planck_noise(channel, shape, wcs):
+    ivar_full = load_planck_noise(channel)
+
+    shape3 = (3,) + shape[-2:]
+    ivar = enmap.project(ivar_full, shape3, wcs, order=0)
+
+    ivar_np = np.array(ivar)  # plain numpy, no WCS overhead
+    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+
+    return enmap.enmap(np.random.standard_normal(shape3) * std, wcs)
+
 
 def act_noise(channel, shape, wcs, pa):
+    ivar_full = load_act_noise(channel, pa)
+
+    n_comp = ivar_full.shape[0]
+    shape_out = (n_comp,) + shape[-2:]
+    ivar = enmap.project(ivar_full, shape_out, wcs, order=0)
+
+    ivar_np = np.array(ivar)  # plain numpy, no WCS overhead
+    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+
+    noise = enmap.enmap(np.random.standard_normal(shape_out) * std, wcs)
+
+    if n_comp < 3:
+        pad = enmap.zeros((3,) + shape[-2:], wcs)
+        pad[:n_comp] = noise
+        return pad
 
     return noise
 
-def accurate_noise(telescope, channel, shape, wcs, pa):
+
+def accurate_noise(telescope, channel, shape, wcs, pa=None):
     assert telescope in ["act", "planck"]
 
     if telescope == "planck":
-        planck_noise(channel=channel, shape=shape, wcs=wcs)
-
+        return planck_noise(channel=channel, shape=shape, wcs=wcs)
     else:
-        act_noise(channel=channel, shape=shape, wcs=wcs, pa=pa)
+        return act_noise(channel=channel, shape=shape, wcs=wcs, pa=pa)
