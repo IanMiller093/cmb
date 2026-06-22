@@ -2,8 +2,12 @@ from pixell_cmb import make_cmb
 from pysm_foreground import make_foreground
 from pixell_noise import make_noise
 from act_planck_beam import apply_beam
+from act_planck_noise import accurate_noise
 
-def make_cmb_and_foreground(dec_radius=90, ra_radius=180, seed=67, res=1, sky_f=150, foreground_components=["d0"], gaussian_noise=True, beam=True, rot=False, bp=True, bb_telescope="planck", bb_channel=100, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd"):
+from pixell import enmap, utils
+import numpy as np
+
+def make_cmb_and_foreground(dec_radius=90, ra_radius=180, seed=67, res=1, sky_f=150, foreground_components=["d0"], include_noise=True, beam=True, rot=False, bp=True, bb_telescope="planck", bb_channel=100, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd"):
     '''
     pretty much just a wrapper of make_cmb and make_foreground.  I'm too lazy to copy over the comments
     about params from the other files, and the fishies would get mad at me if I used Claude to grab the
@@ -22,7 +26,10 @@ def make_cmb_and_foreground(dec_radius=90, ra_radius=180, seed=67, res=1, sky_f=
     else:
         result = cmb + foreground
 
-    if gaussian_noise:
-        result += make_noise(dec_radius, ra_radius, res)
+    if include_noise:
+        box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
+        shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
+
+        result += accurate_noise(telescope=bb_telescope, channel=bb_channel, shape=shape, wcs=wcs, pa=bb_pa)
 
     return result

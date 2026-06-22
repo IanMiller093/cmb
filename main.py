@@ -16,7 +16,6 @@ import numpy as np
 from pixell import utils, enmap
 
 '''
-2) test noise
 3) test different scenarios with beams
 4) fix beam call in pixell_cmb to get around almxfl
 5) organize img files
