@@ -1,7 +1,6 @@
 from pixell_cmb import make_cmb
 from pysm_foreground import make_foreground
 from cmb_and_foreground import make_cmb_and_foreground
-from pixell_noise import make_noise
 from plot_power_spectrum import plot_ps
 from plot_rectangular_map import plot_rect_map
 from plot_ps_compare import plot_ps_compare
@@ -18,7 +17,6 @@ from pixell import utils, enmap
 '''
 3) test different scenarios with beams
 4) fix beam call in pixell_cmb to get around almxfl
-5) organize img files
 '''
 
 
@@ -30,10 +28,8 @@ NOISE_RA_R = 8
 box = np.array([[-1 * NOISE_DEC_R, NOISE_RA_R], [NOISE_DEC_R, -1 * NOISE_RA_R]]) * utils.degree
 shape, wcs = enmap.geometry(pos=box, res=1 * utils.arcmin, proj='car')
 
-act_noise_map = accurate_noise(telescope="act", channel=150, shape=shape, wcs=wcs)
 planck_noise_map = accurate_noise(telescope="planck", channel=143, shape=shape, wcs=wcs)
 
-plot_rect_map(act_noise_map, IMG_OUT_PATH + "act_noise")
 plot_rect_map(planck_noise_map, IMG_OUT_PATH + "planck_noise")
 
 # plot_ps_compare(

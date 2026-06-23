@@ -68,9 +68,9 @@ def apply_act_beam(imap=None, alms=None, lmax=5000, pa=5, channel=150, beam_type
     alms = curvedsky.almxfl(alms, beam_ell)
     return curvedsky.alm2map(alms, imap.copy())
 
-def apply_beam(imap=None, alms=None, lmax=5000, telescope="planck", channel=100, pa=5, beam_type="jitter_cmb", split="coadd"):
+def apply_beam(imap=None, alms=None, cls=None, lmax=5000, telescope="planck", channel=100, pa=5, beam_type="jitter_cmb", split="coadd"):
     assert telescope in ["planck", "act"]
-
+    
     if imap is not None:
         if (telescope == "planck"):
             beamed = apply_planck_beam(imap=imap, lmax=lmax, channel=channel)

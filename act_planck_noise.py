@@ -62,14 +62,16 @@ def planck_noise(channel, shape, wcs):
 
 
 def act_noise(channel, shape, wcs, pa):
-    ivar_full = load_act_noise(channel, pa)
+    # ivar -> var
+    var_full = load_act_noise(channel, pa)
 
-    n_comp = ivar_full.shape[0]
+    n_comp = var_full.shape[0]
     shape_out = (n_comp,) + shape[-2:]
-    ivar = enmap.project(ivar_full, shape_out, wcs, order=0)
+    var = enmap.project(var_full, shape_out, wcs, order=0)
 
-    ivar_np = np.array(ivar)
-    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+    var_np = np.array(ivar)
+    # changed from 1 over ivar
+    std = np.where(var_np > 0, np.sqrt(np.maximum(ivar_np, 0)), 0.0)
 
     noise = enmap.enmap(np.random.standard_normal(shape_out) * std, wcs)
 
