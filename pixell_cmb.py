@@ -8,6 +8,7 @@ from act_planck_beam import apply_beam
 from pixell import enmap, reproject, utils, curvedsky, powspec, enplot
 import matplotlib.pyplot as plt
 import camb
+from pixell import curvedsky, enmap
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -37,8 +38,6 @@ def get_camb_cls(lmax=6000):
 
     cls = powers['lensed_scalar']
     return cls
-
-from pixell import curvedsky, enmap
 
 def make_cmb_ps_matrix(cls):
     
@@ -78,6 +77,8 @@ def make_cmb(dec_radius=90, ra_radius=180, seed=67, res=1, beam=True, beam_teles
     nyquist_lmax = (60 / res) * 180
 
     cls = get_camb_cls(lmax=nyquist_lmax)
+    if beam:
+        cls = apply_beam(cls=cls, lmax=nyquist_lmax, telescope=beam_telescope, channel=beam_channel, pa=beam_pa, beam_type=beam_type, split=beam_split)
     ps  = make_cmb_ps_matrix(cls)
 
     # geometry nonsense
@@ -88,20 +89,12 @@ def make_cmb(dec_radius=90, ra_radius=180, seed=67, res=1, beam=True, beam_teles
 
         gen_map = enmap.rand_map(shape=(3,) + shape, wcs=wcs, cov=ps, seed=seed)
 
-        if beam:
-            beamed_map = apply_beam(imap=gen_map, alms=None, lmax=nyquist_lmax, telescope=beam_telescope, channel=beam_channel, pa=beam_pa, beam_type=beam_type, split=beam_split)
-            gen_map = beamed_map
-
     else:
 
         shape_map = enmap.zeros((3,) + shape, wcs=wcs)
 
         gen_alms = curvedsky.rand_alm(ps=ps, seed=seed, lmax=nyquist_lmax)
 
-        if beam:
-            beamed_map = apply_beam(imap=None, alms=gen_alms, lmax=nyquist_lmax, telescope=beam_telescope, channel=beam_channel, pa=beam_pa, beam_type=beam_type, split=beam_split)
-            gen_map = beamed_map
-        else:
-            gen_map = alm2map(gen_alms)
+        gen_map = alm2map(gen_alms)
     
     return gen_map

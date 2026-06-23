@@ -16,32 +16,16 @@ from pixell import utils, enmap
 
 '''
 3) test different scenarios with beams
-4) fix beam call in pixell_cmb to get around almxfl
 '''
-
 
 IMG_OUT_PATH = "/data6/miller42/cmb_sim/image_outputs/"
 
-NOISE_DEC_R = 4
-NOISE_RA_R = 8
+act_full_sim_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, seed=67, res=1, foreground_components=["d0"], include_noise=True, beam=True, rot=True, bp=True, bb_telescope="act", bb_channel=150, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd")
+act_cmb_map = make_cmb(dec_raidus=4, ra_radius=8, seed=67, res=1, beam=True, beam_telescope="act", beam_channel=150, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd")
+planck_full_sim_map = make_cmb_and_foreground(dec_radius=4, ra_radius=8, seed=67, res=1, foreground_components=["d0"], include_noise=True, beam=True, rot=True, bp=True, bb_telescope="planck", bb_channel=143, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd")
+planck_cmb_map = make_cmb(dec_raidus=4, ra_radius=8, seed=67, res=1, beam=True, beam_telescope="planck", beam_channel=143, beam_pa=5, flatsky=True, beam_type="jitter_cmb", beam_split="coadd")
 
-box = np.array([[-1 * NOISE_DEC_R, NOISE_RA_R], [NOISE_DEC_R, -1 * NOISE_RA_R]]) * utils.degree
-shape, wcs = enmap.geometry(pos=box, res=1 * utils.arcmin, proj='car')
-
-planck_noise_map = accurate_noise(telescope="planck", channel=143, shape=shape, wcs=wcs)
-
-plot_rect_map(planck_noise_map, IMG_OUT_PATH + "planck_noise")
-
-# plot_ps_compare(
-#     imap1=act_full_sim_map,
-#     imap2=planck_full_sim_map,
-#     name=IMG_OUT_PATH+"beam_bp_rotated_full_sim_planck_act_ps_compare",
-#     fullsky=False,
-#     map1_label="ACT 150 GHz",
-#     map2_label="Planck 143 GHz",
-#     lmax=5000,
-#     title="CMB Power Spectra Comparison"
-# )
-
-# plot_2d_ps(imap=act_full_sim_map, name=IMG_OUT_PATH+"beam_bp_act_rotated_full_sim_map")
-# plot_2d_ps(imap=planck_full_sim_map, name=IMG_OUT_PATH+"beam_bp_planck_rotated_full_sim_map")
+plot_rect_map(imap=act_full_sim_map, name=IMG_OUT_PATH+"beam_bp_act_rotated_full_sim_map")
+plot_rect_map(imap=act_cmb_map, name=IMG_OUT_PATH+"beam_bp_act_rotated_cmb_map")
+plot_rect_map(imap=planck_full_sim_map, name=IMG_OUT_PATH+"beam_bp_planck_rotated_full_sim_map")
+plot_rect_map(imap=planck_cmb_map, name=IMG_OUT_PATH+"beam_bp_planck_rotated_cmb_map")
