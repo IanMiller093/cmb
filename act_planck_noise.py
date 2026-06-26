@@ -62,25 +62,19 @@ def planck_noise(channel, shape, wcs):
 
 
 def act_noise(channel, shape, wcs, pa):
-    # ivar -> var
     var_full = load_act_noise(channel, pa)
 
-    n_comp = var_full.shape[0]
-    shape_out = (n_comp,) + shape[-2:]
-    var = enmap.project(var_full, shape_out, wcs, order=0)
+    # project to target map geometry (no fake component axis)
+    var = enmap.project(var_full, shape[-2:], wcs, order=0)
 
-    var_np = np.array(ivar)
-    # changed from 1 over ivar
-    std = np.where(var_np > 0, np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+    var = np.array(var)
 
-    noise = enmap.enmap(np.random.standard_normal(shape_out) * std, wcs)
+    # interpret as variance (or inverse variance depending on file convention)
+    std = np.where(var > 0, np.sqrt(np.maximum(var, 0)), 0.0)
 
-    if n_comp < 3:
-        pad = enmap.zeros((3,) + shape[-2:], wcs)
-        pad[:n_comp] = noise
-        return pad
+    noise_TQU = np.random.standard_normal((3,) + shape[-2:]) * std
 
-    return noise
+    return enmap.enmap(noise_TQU, wcs)
 
 
 def accurate_noise(telescope, channel, shape, wcs, pa=None):

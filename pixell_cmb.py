@@ -74,7 +74,7 @@ def make_cmb(dec_radius=90, ra_radius=180, seed=67, res=1, beam=True, beam_teles
     '''
 
     # for the whole sphere
-    nyquist_lmax = (60 / res) * 180
+    nyquist_lmax = (60 // res) * 180
 
     cls = get_camb_cls(lmax=nyquist_lmax)
     if beam:
