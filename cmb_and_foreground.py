@@ -65,31 +65,35 @@ def rj_to_cmb_factor(nu):
     ex = np.exp(x)
     return x**2 * ex / (ex - 1)**2
 
-def hp_to_car_wrapper(hp_map, shape, wcs, rot=False):
+def hp_to_car_wrapper(hp_map, shape, wcs, rot=True):
     
     rot_str = "gal,cel" if rot else None
     car = reproject.healpix2map(hp_map, shape[-2:], wcs, rot=rot_str)
     return np.array(car).flatten()
 
 def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
-
-    # normalize weights so trapz integrates to 1
-    norm = np.trapz(bp_weights, bp_freqs)
+    norm = np.trapezoid(bp_weights, bp_freqs)
     bp_weights_normed = bp_weights / norm
-
-    # integrand shape: (N_freq, N_pix)
-    integrand = np.zeros((len(bp_freqs), len(beta_map)))
-
+    
+    result = np.zeros(len(beta_map))
+    prev_integrand = None
+    
     for i, nu in enumerate(bp_freqs):
-        mbb = dust_sed_scaling(nu, nu_0, beta_map, T_dust_map)       # (N_pix,)
-        integrand[i, :] = mbb / rj_to_cmb_factor(nu) * bp_weights_normed[i]
-
-    return np.trapz(integrand, bp_freqs, axis=0)    # (N_pix,)
+        mbb = dust_sed_scaling(nu, nu_0, beta_map, T_dust_map)
+        curr_integrand = mbb / rj_to_cmb_factor(nu) * bp_weights_normed[i]
+        
+        if prev_integrand is not None:
+            # trapezoid rule step: 0.5 * (f_i + f_{i-1}) * dx
+            result += 0.5 * (prev_integrand + curr_integrand) * (bp_freqs[i] - bp_freqs[i-1])
+        
+        prev_integrand = curr_integrand
+    
+    return result
 
 
 def bandpass_sed_cmb(bp_freqs, bp_weights):
 
-    norm = np.trapz(bp_weights, bp_freqs)
+    norm = np.trapezoid(bp_weights, bp_freqs)
     bp_weights_normed = bp_weights / norm
 
     integrand = np.array([
@@ -97,7 +101,7 @@ def bandpass_sed_cmb(bp_freqs, bp_weights):
         for i, nu in enumerate(bp_freqs)
     ])
 
-    return np.trapz(integrand, bp_freqs)
+    return np.trapezoid(integrand, bp_freqs)
 
 
 
@@ -113,9 +117,9 @@ apply beams to channels of the same frequency??? ->
 add noise ->
 return T and d
 
-Currently generalized to just look at intensity
+Currently just look at intensity
 '''
-def new_cmb_and_foreground(freqs, dust_list=["d1"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=False):
+def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=["d1"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=False, include_noise=True, rot=True):
 
     # N_comp * N_chan is the number of individual maps we'll have
     # number of freq channels
@@ -130,23 +134,31 @@ def new_cmb_and_foreground(freqs, dust_list=["d1"], res_arcmin=1, beam=True, see
     sky = pysm3.Sky(nside=sky_nside, preset_strings=dust_list)
     dust_model = sky.components[0]
 
-    a_cmb = make_cmb(dec_radius=90, ra_radius=180, seed=seed, res=res_arcmin, beam=beam, beam_telescope=beam_telescope, flatsky=flatsky)
+    a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=beam, beam_telescope=beam_telescope, flatsky=flatsky)
     shape = a_cmb.shape
     wcs = a_cmb.wcs
 
-    a_dust = dust_model.map_I.value.squeeze()
+    a_dust = dust_model.I_ref.value.squeeze()
     beta_dust = dust_model.mbb_index.value.squeeze()
     T_dust = dust_model.mbb_temperature.value.squeeze()
     nu_0_dust = dust_model.freq_ref_I.to("GHz").value
 
-    a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=False)
-    beta_dust = hp_to_car_wrapper(beta_dust, shape, wcs, rot=False)
-    T_dust = hp_to_car_wrapper(T_dust, shape, wcs, rot=False)
-
+    a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=rot)
+    
     a_cmb_1d = np.array(a_cmb[0]).flatten()
 
     N_pix = len(a_cmb_1d)
     assert len(a_dust) == N_pix, "pixel count mismatch after reprojection"
+
+    if beta_dust.ndim == 0:
+        beta_dust = np.full(N_pix, beta_dust.item())
+    else:
+        beta_dust = hp_to_car_wrapper(beta_dust, shape, wcs, rot=rot)
+
+    if T_dust.ndim == 0:
+        T_dust = np.full(N_pix, T_dust.item())
+    else:
+        T_dust = hp_to_car_wrapper(T_dust, shape, wcs, rot=rot)
 
     bandpasses = [bandpass(telescope=beam_telescope, channel=nu) for nu in freqs]
 
@@ -162,4 +174,12 @@ def new_cmb_and_foreground(freqs, dust_list=["d1"], res_arcmin=1, beam=True, see
     d_tensor = np.einsum('fcp,cp->fp', T, a)
     d_vector = d_tensor.flatten()
 
-    return d_vector
+    for f_idx, nu in enumerate(freqs):
+        pa = beam_pas[f_idx] if beam_pas is not None else None
+        noise_map = accurate_noise(telescope=beam_telescope, channel=nu, shape=shape, wcs=wcs, pa=pa)
+        
+        # take only I component for now
+        d_tensor[f_idx, :] += np.array(noise_map[0]).flatten()
+
+
+    return d_vector, T, shape, wcs

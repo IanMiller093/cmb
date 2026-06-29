@@ -95,6 +95,6 @@ def make_cmb(dec_radius=90, ra_radius=180, seed=67, res=1, beam=True, beam_teles
 
         gen_alms = curvedsky.rand_alm(ps=ps, seed=seed, lmax=nyquist_lmax)
 
-        gen_map = alm2map(gen_alms)
+        gen_map = curvedsky.alm2map(gen_alms, shape_map)
     
     return gen_map
