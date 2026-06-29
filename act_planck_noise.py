@@ -50,27 +50,31 @@ def load_act_noise(channel, pa):
 
 
 def planck_noise(channel, shape, wcs):
-    ivar_full = load_planck_noise(channel)
+    ivar_full = load_planck_noise(channel)  # units: K⁻² (ivar convention)
 
     shape3 = (3,) + shape[-2:]
     ivar = enmap.project(ivar_full, shape3, wcs, order=0)
 
     ivar_np = np.array(ivar)
-    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+
+    # Planck ivar is in K⁻²_CMB; convert to μK⁻²_CMB (multiply by 1e12)
+    # so that std comes out in μK, consistent with CMB signal maps
+    ivar_uK = ivar_np * 1e12
+
+    std = np.where(ivar_uK > 0, 1.0 / np.sqrt(ivar_uK), 0.0)
 
     return enmap.enmap(np.random.standard_normal(shape3) * std, wcs)
 
 
 def act_noise(channel, shape, wcs, pa):
-    var_full = load_act_noise(channel, pa)
+    ivar_full = load_act_noise(channel, pa)  # units: μK⁻²
 
     # project to target map geometry (no fake component axis)
-    var = enmap.project(var_full, shape[-2:], wcs, order=0)
+    ivar = enmap.project(ivar_full, shape[-2:], wcs, order=0)
 
-    var = np.array(var)
+    ivar_np = np.array(ivar)
 
-    # interpret as variance (or inverse variance depending on file convention)
-    std = np.where(var > 0, np.sqrt(np.maximum(var, 0)), 0.0)
+    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
 
     noise_TQU = np.random.standard_normal((3,) + shape[-2:]) * std
 

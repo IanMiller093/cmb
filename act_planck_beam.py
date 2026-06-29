@@ -101,3 +101,13 @@ def apply_beam(imap=None, alms=None, cls=None, lmax=5000, telescope="planck", ch
             beamed = apply_act_beam(alms=alms, lmax=lmax, pa=pa, channel=channel, beam_type=beam_type, split=split)
 
     return enmap.apply_window(beamed, order=1)
+
+
+
+'''
+what to do if given vector?
+
+this would be full sim vector -> full sim map -> alms -> almxfl -> back to map -> back to vector?
+
+
+'''

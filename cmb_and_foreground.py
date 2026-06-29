@@ -119,13 +119,15 @@ return T and d
 
 Currently just look at intensity
 '''
-def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=["d1"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=False, include_noise=True, rot=True):
+def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=["d1"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=False, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd"):
 
     # N_comp * N_chan is the number of individual maps we'll have
     # number of freq channels
     N_chan = len(freqs)
     # for cmb and dust
     N_comp = 2
+
+    nyquist_lmax = (60 // res_arcmin) * 180
 
     sky_nside  = 1
     while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
@@ -134,7 +136,7 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
     sky = pysm3.Sky(nside=sky_nside, preset_strings=dust_list)
     dust_model = sky.components[0]
 
-    a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=beam, beam_telescope=beam_telescope, flatsky=flatsky)
+    a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=False, beam_telescope=beam_telescope, flatsky=flatsky)
     shape = a_cmb.shape
     wcs = a_cmb.wcs
 
@@ -172,7 +174,6 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
     a = np.vstack([a_cmb_1d, a_dust]) 
 
     d_tensor = np.einsum('fcp,cp->fp', T, a)
-    d_vector = d_tensor.flatten()
 
     for f_idx, nu in enumerate(freqs):
         pa = beam_pas[f_idx] if beam_pas is not None else None
@@ -181,5 +182,26 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
         # take only I component for now
         d_tensor[f_idx, :] += np.array(noise_map[0]).flatten()
 
+    d_vector = d_tensor.flatten()
+
+    if beam:
+        beamed_vector = np.array([])
+        ny, nx = shape[-2:]
+
+        for i in range(N_chan):
+            imap_np = d_vector.reshape(N_chan, ny, nx)[i]
+            imap_3 = enmap.ndmap(np.stack([imap_np, imap_np, imap_np]), wcs)  # (3, ny, nx)
+            beamed_map = apply_beam(
+                imap=imap_3, alms=None, cls=None,
+                lmax=nyquist_lmax,
+                telescope=beam_telescope,
+                channel=freqs[i],
+                pa=(None if beam_pas is None else beam_pas[i]),
+                beam_type=beam_type,
+                split=beam_split
+            )
+            beamed_vector = np.concatenate((beamed_vector, np.array(beamed_map[0]).flatten()))
+            
+        d_vector = beamed_vector
 
     return d_vector, T, shape, wcs
