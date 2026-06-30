@@ -170,33 +170,24 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
 
     d_tensor = np.einsum('fcp,cp->fp', T, a)
 
-    for f_idx, nu in enumerate(freqs):
-        pa = beam_pas[f_idx] if beam_pas is not None else None
-        noise_map = accurate_noise(telescope=beam_telescope, channel=nu, shape=shape, wcs=wcs, pa=pa)
-        
-        # take only I component for now
-        d_tensor[f_idx, :] += np.array(noise_map[0]).flatten()
-
-    d_vector = d_tensor.flatten()
-
     if beam:
-        beamed_vector = np.array([])
         ny, nx = shape[-2:]
-
+        beamed_vector = np.array([])
         for i in range(N_chan):
-            imap_np = d_vector.reshape(N_chan, ny, nx)[i]
-            imap_3 = enmap.ndmap(np.stack([imap_np, imap_np, imap_np]), wcs)  # (3, ny, nx)
-            beamed_map = apply_beam(
-                imap=imap_3, alms=None, cls=None,
-                lmax=nyquist_lmax,
-                telescope=beam_telescope,
-                channel=freqs[i],
-                pa=(None if beam_pas is None else beam_pas[i]),
-                beam_type=beam_type,
-                split=beam_split
-            )
+            imap_np = d_tensor[i].reshape(ny, nx)
+            imap_3 = enmap.ndmap(np.stack([imap_np]*3), wcs)
+            beamed_map = apply_beam(imap=imap_3, alms=None, cls=None, lmax=nyquist_lmax, telescope=beam_telescope, channel=freqs[i], pa=(None if beam_pas is None else beam_pas[i]), beam_type=beam_type, split=beam_split)
             beamed_vector = np.concatenate((beamed_vector, np.array(beamed_map[0]).flatten()))
-            
         d_vector = beamed_vector
+    else:
+        d_vector = d_tensor.flatten()
+
+    if include_noise:
+        d_vector = d_vector.reshape(N_chan, N_pix)
+        for f_idx, nu in enumerate(freqs):
+            pa = beam_pas[f_idx] if beam_pas is not None else None
+            noise_map = accurate_noise(telescope=beam_telescope, channel=nu, shape=shape, wcs=wcs, pa=pa)
+            d_vector[f_idx, :] += np.array(noise_map[0]).flatten()
+        d_vector = d_vector.flatten()
 
     return d_vector, T, shape, wcs
