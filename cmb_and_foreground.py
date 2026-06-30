@@ -103,11 +103,6 @@ def bandpass_sed_cmb(bp_freqs, bp_weights):
 
     return np.trapezoid(integrand, bp_freqs)
 
-
-
-# TODO: generalize to not fullsky?
-# TODO: wait what do I do about generating the map with one freq?
-
 '''
 NEW lacrosse pipeline segue finance: 
 cmb w/o beam -> 

@@ -30,7 +30,7 @@ IMG_OUT_PATH = "/data6/miller42/cmb_sim/image_outputs/"
 freqs = [100, 143]
 N_chan = len(freqs)
 
-d_flat, T, shape, wcs = new_make_cmb_and_foreground(freqs=freqs, dec_radius=4, ra_radius=8, dust_list=["d0"], res_arcmin=1, beam=True, seed=67, beam_telescope="planck", beam_pas=None, flatsky=False, include_noise=True)
+d_flat, T, shape, wcs = new_make_cmb_and_foreground(freqs=freqs, dec_radius=4, ra_radius=8, dust_list=["d0"], res_arcmin=1, beam=True, seed=67, beam_telescope="planck", beam_pas=None, flatsky=True, include_noise=True)
 
 ny, nx = shape[-2:]
 

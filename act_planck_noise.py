@@ -50,15 +50,16 @@ def load_act_noise(channel, pa):
 
 
 def planck_noise(channel, shape, wcs):
-    ivar_full = load_planck_noise(channel)  # units: K⁻² (ivar convention)
+    # units: K^(-2) (ivar convention)
+    ivar_full = load_planck_noise(channel)
 
     shape3 = (3,) + shape[-2:]
     ivar = enmap.project(ivar_full, shape3, wcs, order=0)
 
     ivar_np = np.array(ivar)
 
-    # Planck ivar is in K⁻²_CMB; convert to μK⁻²_CMB (multiply by 1e12)
-    # so that std comes out in μK, consistent with CMB signal maps
+    # Planck ivar is in K^(-2)_CMB; convert to mu K^(-2)_CMB (multiply by 1e12)
+    # so that std comes out in mu K, consistent with CMB signal maps
     ivar_uK = ivar_np * 1e12
 
     std = np.where(ivar_uK > 0, 1.0 / np.sqrt(ivar_uK), 0.0)
@@ -67,7 +68,8 @@ def planck_noise(channel, shape, wcs):
 
 
 def act_noise(channel, shape, wcs, pa):
-    ivar_full = load_act_noise(channel, pa)  # units: μK⁻²
+    # units: mu K^(-2)
+    ivar_full = load_act_noise(channel, pa)
 
     # project to target map geometry (no fake component axis)
     ivar = enmap.project(ivar_full, shape[-2:], wcs, order=0)
