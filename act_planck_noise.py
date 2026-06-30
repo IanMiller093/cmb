@@ -50,7 +50,11 @@ def load_act_noise(channel, pa):
 
 
 def planck_noise(channel, shape, wcs):
-    # units: K^(-2) (ivar convention)
+    # Empirically confirmed (median ivar ~9.5e-6 -> implied std ~324 uK with
+    # NO extra conversion) that Planck HFI R3.01 ivar maps from this pipeline
+    # are already natively in mu K^(-2)_CMB, not K^(-2)_CMB. Do NOT multiply
+    # by 1e12 here, that was based on an unverified assumption about the
+    # standard Planck convention and was wrong for these specific files.
     ivar_full = load_planck_noise(channel)
 
     shape3 = (3,) + shape[-2:]
@@ -58,17 +62,15 @@ def planck_noise(channel, shape, wcs):
 
     ivar_np = np.array(ivar)
 
-    # Planck ivar is in K^(-2)_CMB; convert to mu K^(-2)_CMB (multiply by 1e12)
-    # so that std comes out in mu K, consistent with CMB signal maps
-    ivar_uK = ivar_np * 1e12
-
-    std = np.where(ivar_uK > 0, 1.0 / np.sqrt(ivar_uK), 0.0)
+    std = np.where(ivar_np > 0, 1.0 / np.sqrt(ivar_np), 0.0)
 
     return enmap.enmap(np.random.standard_normal(shape3) * std, wcs)
 
 
 def act_noise(channel, shape, wcs, pa):
-    # units: mu K^(-2)
+    # Empirically confirmed (median ivar ~9.4e-5 -> implied std ~103 uK with
+    # no conversion) that ACT DR6v4 ivar maps are natively in mu K^(-2)_CMB.
+    # No conversion needed.
     ivar_full = load_act_noise(channel, pa)
 
     # project to target map geometry (no fake component axis)
