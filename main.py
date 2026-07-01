@@ -17,17 +17,21 @@ from pixell import utils, enmap
 
 IMG_OUT_PATH = "/data6/miller42/cmb_sim/image_outputs/"
 
-freqs = [100, 143]
-N_chan = len(freqs)
+planck_freqs = [100, 143, 217, 353, 545, 857]
+act_freqs = [90, 150, 220]
+N_chan_planck = len(planck_freqs)
+N_chan_act = len(act_freqs)
 
-d_flat, T, shape, wcs = new_make_cmb_and_foreground(freqs=freqs, dec_radius=4, ra_radius=8, dust_list=["d0"], res_arcmin=1, beam=True, seed=67, beam_telescope="planck", beam_pas=None, flatsky=True, include_noise=True)
+d_flat_planck, T_planck, shape_planck, wcs_planck = new_make_cmb_and_foreground(freqs=planck_freqs, dec_radius=4, ra_radius=8, dust_list=["d0"], res_arcmin=1, beam=True, seed=67, beam_telescope="planck", beam_pas=None, flatsky=True, include_noise=True)
+d_flat_act, T_act, shape_act, wcs_act = new_make_cmb_and_foreground(freqs=act_freqs, dec_radius=4, ra_radius=8, dust_list=["d0"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=True, include_noise=True)
 
-ny, nx = shape[-2:]
+ny_p, nx_p = shape_planck[-2:]
+ny_a, nx_a = shape_act[-2:]
 
-f_idx = 0
-channel_map_idx_0 = d_flat.reshape(N_chan, ny, nx)[f_idx]
-plot_rect_map(channel_map_idx_0, name=IMG_OUT_PATH+f"vector_reconstructed_I_{freqs[f_idx]}GHz")
+for idx, freq in enumerate(planck_freqs):
+    channel_map = d_flat_planck.reshape(N_chan_planck, ny_p, nx_p)[idx]
+    plot_rect_map(channel_map, name=IMG_OUT_PATH+f"vector_reconstructed_I_planck_{freq}GHz")
 
-f_idx = 1
-channel_map_idx_1 = d_flat.reshape(N_chan, ny, nx)[f_idx]
-plot_rect_map(channel_map_idx_1, name=IMG_OUT_PATH+f"vector_reconstructed_I_{freqs[f_idx]}GHz")
+for idx, freq in enumerate(act_freqs):
+    channel_map = d_flat_act.reshape(N_chan_act, ny_a, nx_a)[idx]
+    plot_rect_map(channel_map, name=IMG_OUT_PATH+f"vector_reconstructed_I_act_{freq}GHz")

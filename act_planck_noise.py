@@ -14,7 +14,9 @@ def load_planck_noise(channel):
 
     for ring in ["evenring", "oddring"]:
         fname = (
-            f"{PLANCK_DIR_GPC}/HFI_SkyMap_{channel}_2048_R3.01_full-{ring}_ivar.fits"
+            f"{PLANCK_DIR_GPC}/HFI_SkyMap_{channel}"
+            f"{'-psb' if channel == 353 else ''}"
+            f"_2048_R3.01_full-{ring}_ivar.fits"
         )
         # read all 3 Stokes components (I, Q, U)
         ring_ivar = enmap.read_map(fname)
