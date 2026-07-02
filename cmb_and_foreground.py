@@ -53,11 +53,14 @@ def cmb_sed_scaling(nu):
 
 # sed scaling function for dust
 def dust_sed_scaling(nu, nu_0, beta, T_dust):
-    x = (h_P * nu) / (k_B * T_cmb)
-    x_0 = (h_P * nu_0) / (k_B * T_cmb)
-    x_d = (h_P * nu) / (k_B * T_dust)
-    x_d0 = (h_P * nu_0) / (k_B * T_dust)
-    
+    nu_hz = nu * 1e9
+    nu_0_hz = nu_0 * 1e9
+
+    x = (h_P * nu_hz)   / (k_B * T_cmb)
+    x_0 = (h_P * nu_0_hz) / (k_B * T_cmb)
+    x_d = (h_P * nu_hz)   / (k_B * T_dust)
+    x_d0 = (h_P * nu_0_hz) / (k_B * T_dust)
+
     return (nu / nu_0)**(beta - 1) * ((np.exp(x_d0) - 1)/(np.exp(x_d) - 1)) * ((np.exp(x) - 1)/(np.exp(x_0) - 1))**2 * (np.exp(x_0)/np.exp(x))
 
 # might implement later
@@ -173,7 +176,8 @@ def new_make_cmb_and_foreground(freqs, T, a_cmb_1d, dust_model, shape, wcs, res_
     nyquist_lmax = (60 // res_arcmin) * 180 
 
     # TODO: check if astropy quantity and there's some << u.uk_CMB or something
-    a_dust = dust_model.I_ref.value.squeeze()
+    nu_ref = dust_model.freq_ref_I  # the dust model's reference frequency for I
+    a_dust = dust_model.I_ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze()
 
     a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=rot)
 
