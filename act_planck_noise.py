@@ -57,6 +57,8 @@ def planck_noise(channel, shape, wcs):
     # are already natively in mu K^(-2)_CMB, not K^(-2)_CMB. Do NOT multiply
     # by 1e12 here, that was based on an unverified assumption about the
     # standard Planck convention and was wrong for these specific files.
+    
+    # this thing has shape (3, ny, nx), where the "3" corresponds to II, QQ, UU
     ivar_full = load_planck_noise(channel)
 
     shape3 = (3,) + shape[-2:]
@@ -73,6 +75,9 @@ def act_noise(channel, shape, wcs, pa):
     # Empirically confirmed (median ivar ~9.4e-5 -> implied std ~103 uK with
     # no conversion) that ACT DR6v4 ivar maps are natively in mu K^(-2)_CMB.
     # No conversion needed.
+
+    # unlike planck, this has shape (ny, nx), where this is just the II part.
+    # we need to fill-in for QQ and UU by assuming QQ=UU=0.5*II (*inverse*-variance)
     ivar_full = load_act_noise(channel, pa)
 
     # project to target map geometry (no fake component axis)
@@ -80,9 +85,11 @@ def act_noise(channel, shape, wcs, pa):
 
     ivar_np = np.array(ivar)
 
-    std = np.where(ivar_np > 0, 1.0 / np.sqrt(np.maximum(ivar_np, 0)), 0.0)
+    std = np.where(ivar_np > 0, 1.0 / np.sqrt(ivar_np), 0.0)
 
     noise_TQU = np.random.standard_normal((3,) + shape[-2:]) * std
+
+    noise_TQU[-2:] *= np.sqrt(2)
 
     return enmap.enmap(noise_TQU, wcs)
 

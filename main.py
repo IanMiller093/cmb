@@ -35,3 +35,5 @@ for idx, freq in enumerate(planck_freqs):
 for idx, freq in enumerate(act_freqs):
     channel_map = d_flat_act.reshape(N_chan_act, ny_a, nx_a)[idx]
     plot_rect_map(channel_map, name=IMG_OUT_PATH+f"vector_reconstructed_I_act_{freq}GHz")
+
+# TODO: plot noise variances for each frequency

@@ -52,6 +52,7 @@ def cmb_sed_scaling(nu):
     return 1.0
 
 # sed scaling function for dust
+# TODO: fix this too, in line with doc from Zach
 def dust_sed_scaling(nu, nu_0, beta, T_dust):
     nu_hz = nu   * 1e9
     nu_0_hz = nu_0 * 1e9
@@ -60,10 +61,15 @@ def dust_sed_scaling(nu, nu_0, beta, T_dust):
     planck_ratio = (nu_hz / nu_0_hz)**3 * np.expm1(x0) / np.expm1(x)
     return (nu_hz / nu_0_hz)**(beta + 1) * planck_ratio
 
+    # look at eqs 8, 9, 10 in beyondplanck 1
+
+# might implement later
+'''
 def rj_to_cmb_factor(nu):
     x  = h_P * nu * 1e9 / (k_B * T_CMB)
     ex = np.exp(x)
     return x**2 * ex / (ex - 1)**2
+'''
 
 def hp_to_car_wrapper(hp_map, shape, wcs, rot=True):
     
@@ -80,7 +86,7 @@ def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     
     for i, nu in enumerate(bp_freqs):
         mbb = dust_sed_scaling(nu, nu_0, beta_map, T_dust_map)
-        curr_integrand = mbb / rj_to_cmb_factor(nu) * bp_weights_normed[i]
+        curr_integrand = mbb * bp_weights_normed[i] # / rj_to_cmb_factor(nu) removed
         
         if prev_integrand is not None:
             # trapezoid rule step: 0.5 * (f_i + f_{i-1}) * dx
@@ -90,14 +96,14 @@ def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     
     return result
 
-
+# TODO: double check this is just 1
 def bandpass_sed_cmb(bp_freqs, bp_weights):
 
     norm = np.trapezoid(bp_weights, bp_freqs)
     bp_weights_normed = bp_weights / norm
 
     integrand = np.array([
-        bp_weights_normed[i] / rj_to_cmb_factor(nu)
+        bp_weights_normed[i] # / rj_to_cmb_factor(nu) removed
         for i, nu in enumerate(bp_freqs)
     ])
 
@@ -114,15 +120,24 @@ return T and d
 
 Currently just look at intensity
 '''
-def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=["d1"], res_arcmin=1, beam=True, seed=67, beam_telescope="act", beam_pas=None, flatsky=False, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd"):
 
-    # N_comp * N_chan is the number of individual maps we'll have
-    # number of freq channels
+def make_a_cmb(dec_radius, ra_radius, seed, res_arcmin, flatsky):
+    a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=False, beam_telescope=None, flatsky=flatsky)
+    shape = a_cmb.shape
+    wcs = a_cmb.wcs
+    
+    a_cmb_1d = np.array(a_cmb[0]).flatten()
+
+    N_pix = len(a_cmb_1d)
+    
+    return a_cmb_1d, shape, wcs
+
+
+
+def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_list=["d0"], res_arcmin=1):
+
     N_chan = len(freqs)
-    # for cmb and dust
     N_comp = 2
-
-    nyquist_lmax = (60 // res_arcmin) * 180
 
     sky_nside  = 1
     while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
@@ -131,21 +146,10 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
     sky = pysm3.Sky(nside=sky_nside, preset_strings=dust_list)
     dust_model = sky.components[0]
 
-    a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=False, beam_telescope=beam_telescope, flatsky=flatsky)
-    shape = a_cmb.shape
-    wcs = a_cmb.wcs
-
-    a_dust = dust_model.I_ref.value.squeeze()
     beta_dust = dust_model.mbb_index.value.squeeze()
     T_dust = dust_model.mbb_temperature.value.squeeze()
+    # TODO: find what ref freq is 
     nu_0_dust = dust_model.freq_ref_I.to("GHz").value
-
-    a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=rot)
-    
-    a_cmb_1d = np.array(a_cmb[0]).flatten()
-
-    N_pix = len(a_cmb_1d)
-    assert len(a_dust) == N_pix, "pixel count mismatch after reprojection"
 
     if beta_dust.ndim == 0:
         beta_dust = np.full(N_pix, beta_dust.item())
@@ -166,7 +170,27 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
         T[f_index, 0, :] = bandpass_sed_cmb(bp_freqs, bp_weights)
         T[f_index, 1, :] = bandpass_sed_dust(bp_freqs, bp_weights, nu_0_dust, beta_dust, T_dust)
     
-    a = np.vstack([a_cmb_1d, a_dust]) 
+    return T, dust_model
+
+
+
+def new_make_cmb_and_foreground(freqs, T, a_cmb_1d, dust_model, shape, wcs, res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd"):
+
+    # N_comp * N_chan is the number of individual maps we'll have
+    # number of freq channels
+    N_chan = len(freqs)
+    # for cmb and dust
+    N_comp = 2
+    N_pix = len(a_cmb_1d)
+
+    nyquist_lmax = (60 // res_arcmin) * 180 
+
+    # TODO: check if astropy quantity and there's some << u.uk_CMB or something
+    a_dust = dust_model.I_ref.value.squeeze()
+
+    a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=rot)
+
+    a = np.vstack([a_cmb_1d, a_dust])
 
     d_tensor = np.einsum('fcp,cp->fp', T, a)
 
@@ -190,4 +214,4 @@ def new_make_cmb_and_foreground(freqs, dec_radius=90, ra_radius=180, dust_list=[
             d_vector[f_idx, :] += np.array(noise_map[0]).flatten()
         d_vector = d_vector.flatten()
 
-    return d_vector, T, shape, wcs
+    return d_vector
