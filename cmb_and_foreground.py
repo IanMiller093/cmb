@@ -45,28 +45,25 @@ new cmb_and_foreground architecture below!!!
 # constants yay
 h_P = 6.626e-34
 k_B = 1.381e-23
-T_CMB = 2.725 
+T_cmb = 2.7255
 
 # sed scaling function for cmb
 def cmb_sed_scaling(nu):
     return 1.0
 
 # sed scaling function for dust
-# TODO: fix this too, in line with doc from Zach
 def dust_sed_scaling(nu, nu_0, beta, T_dust):
-    nu_hz = nu   * 1e9
-    nu_0_hz = nu_0 * 1e9
-    x = h_P * nu_hz / (k_B * T_dust)
-    x0 = h_P * nu_0_hz / (k_B * T_dust)
-    planck_ratio = (nu_hz / nu_0_hz)**3 * np.expm1(x0) / np.expm1(x)
-    return (nu_hz / nu_0_hz)**(beta + 1) * planck_ratio
-
-    # look at eqs 8, 9, 10 in beyondplanck 1
+    x = (h_P * nu) / (k_B * T_cmb)
+    x_0 = (h_P * nu_0) / (k_B * T_cmb)
+    x_d = (h_P * nu) / (k_B * T_dust)
+    x_d0 = (h_P * nu_0) / (k_B * T_dust)
+    
+    return (nu / nu_0)**(beta - 1) * ((np.exp(x_d0) - 1)/(np.exp(x_d) - 1)) * ((np.exp(x) - 1)/(np.exp(x_0) - 1))**2 * (np.exp(x_0)/np.exp(x))
 
 # might implement later
 '''
 def rj_to_cmb_factor(nu):
-    x  = h_P * nu * 1e9 / (k_B * T_CMB)
+    x  = h_P * nu * 1e9 / (k_B * T_cmb)
     ex = np.exp(x)
     return x**2 * ex / (ex - 1)**2
 '''
@@ -96,18 +93,8 @@ def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     
     return result
 
-# TODO: double check this is just 1
 def bandpass_sed_cmb(bp_freqs, bp_weights):
-
-    norm = np.trapezoid(bp_weights, bp_freqs)
-    bp_weights_normed = bp_weights / norm
-
-    integrand = np.array([
-        bp_weights_normed[i] # / rj_to_cmb_factor(nu) removed
-        for i, nu in enumerate(bp_freqs)
-    ])
-
-    return np.trapezoid(integrand, bp_freqs)
+    return 1.0
 
 '''
 NEW lacrosse pipeline segue finance: 
@@ -148,7 +135,7 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
 
     beta_dust = dust_model.mbb_index.value.squeeze()
     T_dust = dust_model.mbb_temperature.value.squeeze()
-    # TODO: find what ref freq is 
+    # ref freq of 545 for intensity and 353 for polarized components
     nu_0_dust = dust_model.freq_ref_I.to("GHz").value
 
     if beta_dust.ndim == 0:
