@@ -7,36 +7,8 @@ import pysm3.units as u
 import healpy as hp
 import numpy as np
 from pixell import enmap, reproject, utils
-from bandpass import bandpass   
-
-
-def make_cmb_and_foreground(dec_radius=90, ra_radius=180, seed=67, res=1, sky_f=150, foreground_components=["d0"], include_noise=True, beam=True, rot=False, bp=True, bb_telescope="planck", bb_channel=100, bb_pa=None, beam_type="jitter_cmb", beam_split="coadd"):
-    '''
-    pretty much just a wrapper of make_cmb and make_foreground.  I'm too lazy to copy over the comments
-    about params from the other files, and the fishies would get mad at me if I used Claude to grab the
-    comments, so you will have to go over and read the comments from the other two files yourself :(
-
-    returns make_cmb + make_foreground with the same dimensions
-    '''
-
-    cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res, beam=False, beam_telescope=bb_telescope, beam_channel=bb_channel, beam_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
-    foreground = make_foreground(dec_radius=dec_radius, ra_radius=ra_radius, sky_f=sky_f, res=res, foreground_components=foreground_components, beam=False, rot=rot, bp=bp, bb_telescope=bb_telescope, bb_channel=bb_channel, bb_pa=bb_pa, beam_type=beam_type, beam_split=beam_split)
-    assert cmb.shape == foreground.shape
-
-    if beam:
-        nyquist_lmax = (60 / res) * 180
-        result = apply_beam(imap=(cmb + foreground), lmax=nyquist_lmax, telescope=bb_telescope, channel=bb_channel, pa=bb_pa, beam_type=beam_type, split=beam_split)
-    else:
-        result = cmb + foreground
-
-    if include_noise:
-        box = np.array([[-1 * dec_radius, ra_radius], [dec_radius, -1 * ra_radius]]) * utils.degree
-        shape, wcs = enmap.geometry(pos=box, res=res * utils.arcmin, proj='car')
-
-        result += accurate_noise(telescope=bb_telescope, channel=bb_channel, shape=shape, wcs=wcs, pa=bb_pa)
-
-    return result
-
+from bandpass import bandpass  
+from plot_rectangular_map import plot_rect_map 
 
 '''
 new cmb_and_foreground architecture below!!!
@@ -86,7 +58,8 @@ def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     
     for i, nu in enumerate(bp_freqs):
         mbb = dust_sed_scaling(nu, nu_0, beta_map, T_dust_map)
-        curr_integrand = mbb * bp_weights_normed[i] # / rj_to_cmb_factor(nu) removed
+        # trying something crazy
+        curr_integrand = mbb * bp_weights_normed[i] # / rj_to_cmb_factor(nu)
         
         if prev_integrand is not None:
             # trapezoid rule step: 0.5 * (f_i + f_{i-1}) * dx
@@ -108,19 +81,20 @@ apply beams to channels of the same frequency??? ->
 add noise ->
 return T and d
 
-Currently just look at intensity
+Now returns full T, Q, U (Stokes) maps, not just intensity.
 '''
 
 def make_a_cmb(dec_radius, ra_radius, seed, res_arcmin, flatsky):
     a_cmb = make_cmb(dec_radius=dec_radius, ra_radius=ra_radius, seed=seed, res=res_arcmin, beam=False, beam_telescope=None, flatsky=flatsky)
     shape = a_cmb.shape
     wcs = a_cmb.wcs
-    
-    a_cmb_1d = np.array(a_cmb[0]).flatten()
 
-    N_pix = len(a_cmb_1d)
-    
-    return a_cmb_1d, shape, wcs
+    # T, Q, U
+    a_cmb_stokes = [np.array(a_cmb[s]).flatten() for s in range(3)]
+
+    N_pix = len(a_cmb_stokes[0])
+
+    return a_cmb_stokes, shape, wcs
 
 
 
@@ -128,6 +102,7 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
 
     N_chan = len(freqs)
     N_comp = 2
+    N_stokes = 3
 
     sky_nside  = 1
     while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
@@ -139,7 +114,9 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
     beta_dust = dust_model.mbb_index.value.squeeze()
     T_dust = dust_model.mbb_temperature.value.squeeze()
     # ref freq of 545 for intensity and 353 for polarized components
-    nu_0_dust = dust_model.freq_ref_I.to("GHz").value
+    nu_0_dust_I = dust_model.freq_ref_I.to("GHz").value
+    nu_0_dust_P = dust_model.freq_ref_P.to("GHz").value
+    nu_0_dust_stokes = [nu_0_dust_I, nu_0_dust_P, nu_0_dust_P]
 
     if beta_dust.ndim == 0:
         beta_dust = np.full(N_pix, beta_dust.item())
@@ -154,55 +131,101 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
     bandpasses = [bandpass(telescope=beam_telescope, channel=nu) for nu in freqs]
 
     # actual construct ts T now!!!  Tensor with a bunch of maps as opposed to just one huge matrix
-    T = np.zeros((N_chan, N_comp, N_pix))
+    T = np.zeros((N_chan, N_comp, N_stokes, N_pix))
 
     for f_index, (bp_freqs, bp_weights) in enumerate(bandpasses):
-        T[f_index, 0, :] = bandpass_sed_cmb(bp_freqs, bp_weights)
-        T[f_index, 1, :] = bandpass_sed_dust(bp_freqs, bp_weights, nu_0_dust, beta_dust, T_dust)
+        cmb_scaling = bandpass_sed_cmb(bp_freqs, bp_weights)
+        print("[debug] bp_freqs[0] and bp_freqs[-1]: ")
+        print(bp_freqs[0], bp_freqs[-1])
+        for s in range(N_stokes):
+            T[f_index, 0, s, :] = cmb_scaling
+            T[f_index, 1, s, :] = bandpass_sed_dust(bp_freqs, bp_weights, nu_0_dust_stokes[s], beta_dust, T_dust)
     
+    print(f"[debug] dust_list={dust_list}, beta_dust ndim={dust_model.mbb_index.value.ndim}, "
+        f"beta_dust sample={np.atleast_1d(dust_model.mbb_index.value.squeeze())[:3]}, "
+        f"T_dust sample={np.atleast_1d(dust_model.mbb_temperature.value.squeeze())[:3]}")
+
     return T, dust_model
 
 
 
-def new_make_cmb_and_foreground(freqs, T, a_cmb_1d, dust_model, shape, wcs, res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd"):
+def new_make_cmb_and_foreground(freqs, T, a_cmb_stokes, dust_model, shape, wcs, res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd", debug=False):
 
     # N_comp * N_chan is the number of individual maps we'll have
     # number of freq channels
     N_chan = len(freqs)
     # for cmb and dust
     N_comp = 2
-    N_pix = len(a_cmb_1d)
+    N_stokes = 3
+    N_pix = len(a_cmb_stokes[0])
 
     nyquist_lmax = (60 // res_arcmin) * 180 
 
-    # TODO: check if astropy quantity and there's some << u.uk_CMB or something
-    nu_ref = dust_model.freq_ref_I  # the dust model's reference frequency for I
-    a_dust = dust_model.I_ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze()
+    nu_ref_I = dust_model.freq_ref_I  # dust model's reference frequency for I
+    nu_ref_P = dust_model.freq_ref_P  # dust model's reference frequency for Q/U
 
-    a_dust = hp_to_car_wrapper(a_dust, shape, wcs, rot=rot)
+    dust_ref_attrs = ["I_ref", "Q_ref", "U_ref"]
+    dust_ref_freqs = [nu_ref_I, nu_ref_P, nu_ref_P]
+    a_dust_stokes = []
+    for attr, nu_ref in zip(dust_ref_attrs, dust_ref_freqs):
+        ref = getattr(dust_model, attr, None)
+        if ref is None:
+            a_dust_stokes.append(np.zeros(N_pix))
+        else:
+            ref_uK = ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze()
+            a_dust_stokes.append(hp_to_car_wrapper(ref_uK, shape, wcs, rot=rot))
 
-    a = np.vstack([a_cmb_1d, a_dust])
+    if debug:
+        stokes_labels = ["I", "Q", "U"]
+        for s, label in enumerate(stokes_labels):
+            cmb_rms = np.sqrt(np.mean(a_cmb_stokes[s]**2))
+            dust_rms = np.sqrt(np.mean(a_dust_stokes[s]**2))
+            dust_is_zero = np.allclose(a_dust_stokes[s], 0.0)
+            print(f"[debug] Stokes {label}: cmb_rms={cmb_rms:.4g} uK, "
+                  f"dust_rms={dust_rms:.4g} uK"
+                  f"{'  <-- dust ref map missing/zero!' if dust_is_zero and label != 'I' else ''}")
 
-    d_tensor = np.einsum('fcp,cp->fp', T, a)
+    # a: (N_comp, N_stokes, N_pix)
+    a = np.stack(
+        [np.vstack([a_cmb_stokes[s], a_dust_stokes[s]]) for s in range(N_stokes)],
+        axis=1
+    )
+
+    # d_tensor: (N_chan, N_stokes, N_pix)
+    d_tensor = np.einsum('fcsp,csp->fsp', T, a)
+
+    if debug:
+        for s, label in enumerate(stokes_labels):
+            sig_rms = np.sqrt(np.mean(d_tensor[:, s, :]**2))
+            print(f"[debug] Stokes {label}: pre-beam/noise signal rms across all channels = {sig_rms:.4g} uK")
 
     if beam:
         ny, nx = shape[-2:]
-        beamed_vector = np.array([])
+        beamed_channels = []
         for i in range(N_chan):
-            imap_np = d_tensor[i].reshape(ny, nx)
-            imap_3 = enmap.ndmap(np.stack([imap_np]*3), wcs)
-            beamed_map = apply_beam(imap=imap_3, alms=None, cls=None, lmax=nyquist_lmax, telescope=beam_telescope, channel=freqs[i], pa=(None if beam_pas is None else beam_pas[i]), beam_type=beam_type, split=beam_split)
-            beamed_vector = np.concatenate((beamed_vector, np.array(beamed_map[0]).flatten()))
-        d_vector = beamed_vector
+            imap_i = enmap.ndmap(d_tensor[i].reshape(N_stokes, ny, nx), wcs)
+            beamed_map = apply_beam(imap=imap_i, alms=None, cls=None, lmax=nyquist_lmax, telescope=beam_telescope, channel=freqs[i], pa=(None if beam_pas is None else beam_pas[i]), beam_type=beam_type, split=beam_split)
+            beamed_channels.append(np.array(beamed_map).reshape(N_stokes, N_pix))
+        d_vector = np.stack(beamed_channels, axis=0)
     else:
-        d_vector = d_tensor.flatten()
+        d_vector = d_tensor.copy()
 
     if include_noise:
-        d_vector = d_vector.reshape(N_chan, N_pix)
         for f_idx, nu in enumerate(freqs):
             pa = beam_pas[f_idx] if beam_pas is not None else None
             noise_map = accurate_noise(telescope=beam_telescope, channel=nu, shape=shape, wcs=wcs, pa=pa)
-            d_vector[f_idx, :] += np.array(noise_map[0]).flatten()
-        d_vector = d_vector.flatten()
+            noise_arr = np.array(noise_map).reshape(N_stokes, N_pix)
 
+            if debug:
+                for s, label in enumerate(stokes_labels):
+                    sig_rms = np.sqrt(np.mean(d_vector[f_idx, s, :]**2))
+                    noise_rms = np.sqrt(np.mean(noise_arr[s]**2))
+                    ratio = sig_rms / noise_rms if noise_rms > 0 else np.inf
+                    print(f"[debug] {nu} GHz, Stokes {label}: "
+                          f"post-beam signal rms={sig_rms:.4g} uK, "
+                          f"noise rms={noise_rms:.4g} uK, signal/noise={ratio:.3g}")
+
+            d_vector[f_idx] += noise_arr
+
+    # d_vector: (N_chan, N_stokes, N_pix)
     return d_vector

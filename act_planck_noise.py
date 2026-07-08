@@ -22,7 +22,6 @@ def load_planck_noise(channel):
         ring_ivar = enmap.read_map(fname)
         ivar_full = ring_ivar if ivar_full is None else ivar_full + ring_ivar
 
-    ivar_full /= 2.0
     return ivar_full
 
 
@@ -45,8 +44,6 @@ def load_act_noise(channel, pa):
 
         split_ivar = enmap.read_map(fname)
         ivar = split_ivar if ivar is None else ivar + split_ivar
-
-    ivar /= len(ACT_SETS)
 
     return ivar
 
