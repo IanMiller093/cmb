@@ -1,7 +1,7 @@
 from astropy.io import fits
 import h5py
 
-def bandpass(telescope="planck", channel=100, pa=None):
+def bandpass(telescope="planck", channel=100, pa=None, downsample=False, idx=None):
     '''
     telescope: either "planck" or "act".  Default is "planck"
 
@@ -81,5 +81,8 @@ def bandpass(telescope="planck", channel=100, pa=None):
         bp_weights = bp_weights[mask]
 
         bp_weights = bp_weights / bp_freqs**2
+
+    if downsample:
+        return bp_freqs[::idx], bp_weights[::idx]
 
     return bp_freqs, bp_weights
