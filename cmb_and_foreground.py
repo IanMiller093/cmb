@@ -58,7 +58,6 @@ def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     
     for i, nu in enumerate(bp_freqs):
         mbb = dust_sed_scaling(nu, nu_0, beta_map, T_dust_map)
-        # trying something crazy
         curr_integrand = mbb * bp_weights_normed[i] # / rj_to_cmb_factor(nu)
         
         if prev_integrand is not None:
@@ -149,7 +148,7 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
 
 
 
-def new_make_cmb_and_foreground(freqs, T, a_cmb_stokes, dust_model, shape, wcs, res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd", debug=False):
+def make_cmb_and_foreground(freqs, T, a_cmb_stokes, dust_model, shape, wcs, res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None, include_noise=True, rot=True, beam_type="jitter_cmb", beam_split="coadd", debug=False, give_dust_early=True):
 
     # N_comp * N_chan is the number of individual maps we'll have
     # number of freq channels
@@ -174,6 +173,9 @@ def new_make_cmb_and_foreground(freqs, T, a_cmb_stokes, dust_model, shape, wcs, 
         else:
             ref_uK = ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze()
             a_dust_stokes.append(hp_to_car_wrapper(ref_uK, shape, wcs, rot=rot))
+
+    if give_dust_early:
+        return a_dust_stokes
 
     if debug:
         stokes_labels = ["I", "Q", "U"]
