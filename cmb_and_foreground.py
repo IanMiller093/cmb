@@ -44,10 +44,11 @@ def rj_to_cmb_factor(nu):
 '''
 
 def hp_to_car_wrapper(hp_map, shape, wcs, rot=True):
-    
     rot_str = "gal,cel" if rot else None
-    car = reproject.healpix2map(hp_map, shape[-2:], wcs, rot=rot_str)
-    return np.array(car).flatten()
+    car = np.array(reproject.healpix2map(hp_map, shape[-2:], wcs, rot=rot_str))
+    if car.ndim == 3:  # (N_stokes, ny, nx) -> (N_stokes, npix)
+        return car.reshape(car.shape[0], -1)
+    return car.flatten()
 
 def bandpass_sed_dust(bp_freqs, bp_weights, nu_0, beta_map, T_dust_map):
     norm = np.trapezoid(bp_weights, bp_freqs)
@@ -107,7 +108,7 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
     while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
         sky_nside *= 2
 
-    sky = pysm3.Sky(nside=sky_nside, preset_strings=dust_list)
+    sky = pysm3.Sky(nside=sky_nside, max_nside=sky_nside, preset_strings=dust_list)
     dust_model = sky.components[0]
 
     beta_dust = dust_model.mbb_index.value.squeeze()
@@ -165,14 +166,18 @@ def make_cmb_and_foreground(freqs, T, a_cmb_stokes, dust_model, shape, wcs, res_
 
     dust_ref_attrs = ["I_ref", "Q_ref", "U_ref"]
     dust_ref_freqs = [nu_ref_I, nu_ref_P, nu_ref_P]
-    a_dust_stokes = []
+
+    refs_uK = []
     for attr, nu_ref in zip(dust_ref_attrs, dust_ref_freqs):
         ref = getattr(dust_model, attr, None)
         if ref is None:
-            a_dust_stokes.append(np.zeros(N_pix))
+            refs_uK.append(np.zeros_like(np.atleast_1d(dust_model.I_ref.value.squeeze())))
         else:
-            ref_uK = ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze()
-            a_dust_stokes.append(hp_to_car_wrapper(ref_uK, shape, wcs, rot=rot))
+            refs_uK.append(ref.to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref)).value.squeeze())
+
+    refs_uK_arr = np.array(refs_uK)  # (3, npix_hp) -- I, Q, U together
+    a_dust_stokes_car = hp_to_car_wrapper(refs_uK_arr, shape, wcs, rot=rot)  # single joint call
+    a_dust_stokes = [a_dust_stokes_car[s] for s in range(N_stokes)]
 
     if give_dust_early:
         return a_dust_stokes

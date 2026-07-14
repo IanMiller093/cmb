@@ -42,7 +42,7 @@ N_stokes = 3
 # T_planck, dust_model_planck = make_T_and_dust_model(
 #     N_pix=N_pix_planck, shape=shape_planck, wcs=wcs_planck,
 #     beam_telescope="planck", rot=True, freqs=planck_freqs,
-#     dust_list=["d10"], res_arcmin=1
+#     dust_list=["d0"], res_arcmin=1
 # )
 
 # print(f"make_T_and_dust_model took {time.time() - t0} seconds")
@@ -117,8 +117,10 @@ t0 = time.time()
 T_act, dust_model_act = make_T_and_dust_model(
     N_pix=N_pix_act, shape=shape_act, wcs=wcs_act,
     beam_telescope="act", rot=True, freqs=act_freqs,
-    dust_list=["d10"], res_arcmin=1
+    dust_list=["d0"], res_arcmin=1
 )
+
+print(f"shape of dust_model_act.I_ref is {dust_model_act.I_ref.shape}")
 
 print(f"make_T_and_dust_model took {time.time() - t0} seconds")
 
@@ -130,6 +132,8 @@ a_dust_stokes_act = make_cmb_and_foreground(
     res_arcmin=1, beam=True, beam_telescope="act", beam_pas=None,
     include_noise=True, rot=True, debug=True, give_dust_early=True
 )
+
+# TODO: compare to pysm way as healpix maps without reprojecting
 
 print(f"make_cmb_and_foreground took {time.time() - t0} seconds")
 
@@ -187,3 +191,4 @@ for idx, freq in enumerate(act_freqs):
     channel_map = d_act.reshape(N_chan_act, N_stokes, ny_a, nx_a)[idx]
     plot_rect_map(channel_map, name=IMG_OUT_PATH+f"vector_reconstructed_act_{freq}GHz")
 '''
+
