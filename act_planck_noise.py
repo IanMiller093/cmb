@@ -98,3 +98,25 @@ def accurate_noise(telescope, channel, shape, wcs, pa=None):
         return planck_noise(channel=channel, shape=shape, wcs=wcs)
     else:
         return act_noise(channel=channel, shape=shape, wcs=wcs, pa=pa)
+
+def load_N(telescope, channel, shape, wcs, pa=None):
+    # Returns N, the (diagonal) noise covariance, as a map of shape (3, ny, nx).
+    
+    if telescope == "planck":
+        ivar_full = load_planck_noise(channel)
+        ivar = enmap.project(ivar_full, (3,) + shape[-2:], wcs, order=0)
+        ivar_np = np.array(ivar)
+        N = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
+
+    else:
+        ivar_full = load_act_noise(channel, pa)
+        ivar = enmap.project(ivar_full, shape[-2:], wcs, order=0)
+        ivar_np = np.array(ivar)
+        N_I = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
+
+        N = np.empty((3,) + shape[-2:])
+        N[0] = N_I
+        N[1] = 2 * N_I
+        N[2] = 2 * N_I
+
+    return N
