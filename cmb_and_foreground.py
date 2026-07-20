@@ -90,7 +90,7 @@ def make_a_cmb(dec_radius, ra_radius, seed, res_arcmin, flatsky):
     wcs = a_cmb.wcs
 
     # T, Q, U
-    a_cmb_stokes = [np.array(a_cmb[s]).flatten() for s in range(3)]
+    a_cmb_stokes = np.stack([np.array(a_cmb[s]).flatten() for s in range(3)], axis=0)
 
     return a_cmb_stokes, shape, wcs
 
