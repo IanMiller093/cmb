@@ -24,7 +24,7 @@ def posterior_sample_1_pix(T, d, N):
 
     return x_sample
 
-def posterior_sample(T, d, N):
+def posterior_sample(T, d, N, mu0, S):
     """
     Multi pixel, multi component generalization of posterior_sample_1_pix.
 
@@ -34,7 +34,7 @@ def posterior_sample(T, d, N):
     For each pixel p and each Stokes parameter s independently, solves the small
     (N_comp x N_comp) linear system:
 
-        (T^T N^-1 T) x  =  T^T N^-1 d  +  T^T N^-1/2 eta
+        
 
     where, restricted to pixel p / Stokes s:
         T   : (N_chan, N_comp) mixing matrix (SED scaling per component per channel)
@@ -43,6 +43,8 @@ def posterior_sample(T, d, N):
         eta : (N_chan,)        iid N(0,1) draws (fluctuation term -> correct posterior variance,
                                   not just the posterior mean)
         x   : (N_comp,)        sampled component amplitudes at this pixel (the CMB and dust)
+        S   : (N_comp,)        prior variance for each component (diagonal, no cross-component prior covariance)
+        mu0 : (N_comp,)        prior mean for each component
 
     Parameters
     ----------
@@ -55,6 +57,11 @@ def posterior_sample(T, d, N):
         Diagonal noise covariance (variance), per channel / Stokes / pixel.
         NOTE: load_N gives you (3, ny, nx) per channel — stack over channels and
         flatten (ny, nx) -> N_pix before passing in here, to match d's layout.
+    mu0 : ndarray, shape (N_comp, N_stokes, N_pix)
+        Prior mean for each component amplitude.
+    S : ndarray, shape (N_comp, N_stokes, N_pix)
+        Prior variance (diagonal, no cross-component prior covariance).
+        Use np.inf entries to recover the old no-prior behavior for that component.
 
     Returns
     -------
@@ -65,47 +72,52 @@ def posterior_sample(T, d, N):
 
     N_chan, N_comp, N_stokes, N_pix = T.shape
 
-    # One standard normal draw per (channel, Stokes, pixel) -- this is the fluctuation
-    # term that turns this into an actual *sample* from the posterior, not just its mean.
+    # noise fluctuation term, same as before
     eta1 = np.random.standard_normal(size=(N_chan, N_stokes, N_pix))
 
-    # Move (N_stokes, N_pix) to the front as "batch" axes so we can use numpy's
-    # batched linear algebra (np.linalg.solve broadcasts over leading dims).
-    # (N_stokes, N_pix, N_chan, N_comp)
+    # prior fluctuation term -- one draw per component (not per channel)
+    eta2 = np.random.standard_normal(size=(N_comp, N_stokes, N_pix))
+
     T_T = np.transpose(T, (2, 3, 0, 1))
-    # (N_stokes, N_pix, N_chan)
     d_T = np.transpose(d, (1, 2, 0))
-    # (N_stokes, N_pix, N_chan)
     N_T = np.transpose(N, (1, 2, 0))
-    # (N_stokes, N_pix, N_chan)
     eta1_T = np.transpose(eta1, (1, 2, 0))
 
-    # Diagonal N^-1 and N^-1/2, per channel (broadcast against T_T below)
-    # (N_stokes, N_pix, N_chan)
+    # prior arrays, transposed the same way as mu0/S live per-component
+    mu0_T = np.transpose(mu0, (1, 2, 0))
+    S_T = np.transpose(S, (1, 2, 0))
+    eta2_T = np.transpose(eta2, (1, 2, 0))
+
     Ninv = 1.0 / N_T
-    # (N_stokes, N_pix, N_chan) 
     Ninv_sqrt = np.sqrt(Ninv)
 
-    # --- RHS: T^T N^-1 d  +  T^T N^-1/2 eta1 ---
-    # N^-1 d, per channel
+    # S can have np.inf entries (no prior on that component) -- 1/inf = 0 is fine,
+    # sqrt(0) = 0 is fine, no nan risk here
+    Sinv = 1.0 / S_T
+    Sinv_sqrt = np.sqrt(Sinv)
+
     weighted_d = Ninv * d_T
-    # N^-1/2 eta1, per channel  
     weighted_eta = Ninv_sqrt * eta1_T
 
-    # Contract over the channel axis f: sum_f T[f,c] * (weighted_d + weighted_eta)[f]
-    # (N_stokes, N_pix, N_comp)
-    rhs = np.einsum('spfc,spf->spc', T_T, weighted_d + weighted_eta)
+    # data part of rhs, same as before
+    rhs_data = np.einsum('spfc,spf->spc', T_T, weighted_d + weighted_eta)
 
-    # --- LHS: T^T N^-1 T, an (N_comp x N_comp) "curvature" matrix at every pixel ---
-    # sum_f T[f,c] * N^-1[f] * T[f,k] -> matrix indexed by (c, k)
-    # (N_stokes, N_pix, N_comp, N_comp)
+    # prior part of rhs: S^-1 mu0 + S^-1/2 eta2
+    rhs_prior = Sinv * mu0_T + Sinv_sqrt * eta2_T
+
+    rhs = rhs_data + rhs_prior
+
+    # data part of lhs, same as before
     lhs = np.einsum('spfc,spf,spfk->spck', T_T, Ninv, T_T)
 
-    # Solve the small N_comp x N_comp system simultaneously at every (Stokes, pixel)
-    # (N_stokes, N_pix, N_comp)
-    x_T = np.linalg.solve(lhs, rhs)
+    # add S^-1 onto the diagonal (c == k) of lhs, at every stokes/pixel
+    comp_idx = np.arange(N_comp)
+    lhs[..., comp_idx, comp_idx] += Sinv
 
-    # Back to (N_comp, N_stokes, N_pix) to match your existing array convention
+    print("lhs:", lhs.shape)
+    print("rhs:", rhs.shape)
+    # used to be: x_T = np.linalg.solve(lhs, rhs)
+    x_T = np.linalg.solve(lhs, rhs[..., None])[..., 0]
     x_sample = np.transpose(x_T, (2, 0, 1))
 
     return x_sample
