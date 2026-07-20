@@ -99,24 +99,28 @@ def accurate_noise(telescope, channel, shape, wcs, pa=None):
     else:
         return act_noise(channel=channel, shape=shape, wcs=wcs, pa=pa)
 
-def load_N(telescope, channel, shape, wcs, pa=None):
-    # Returns N, the (diagonal) noise covariance, as a map of shape (3, ny, nx).
-    
-    if telescope == "planck":
-        ivar_full = load_planck_noise(channel)
-        ivar = enmap.project(ivar_full, (3,) + shape[-2:], wcs, order=0)
-        ivar_np = np.array(ivar)
-        N = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
+def load_N_multi_channel(telescope, channels, shape, wcs, pa=None):
+    """
+    Wraps load_N to loop over multiple channels and stack them into the
+    (N_chan, N_stokes, N_pix) shape that posterior_sample expects.
 
-    else:
-        ivar_full = load_act_noise(channel, pa)
-        ivar = enmap.project(ivar_full, shape[-2:], wcs, order=0)
-        ivar_np = np.array(ivar)
-        N_I = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
+    channels : list of channel identifiers (e.g. act_freqs, or planck channel names)
+    shape, wcs : same as load_N
+    pa : passed through to load_N for ACT; ignored for planck
+    """
 
-        N = np.empty((3,) + shape[-2:])
-        N[0] = N_I
-        N[1] = 2 * N_I
-        N[2] = 2 * N_I
+    N_chan = len(channels)
+    # flag: assuming shape[-2:] gives (ny, nx) consistently across channels,
+    # same as load_N already assumes
+    ny, nx = shape[-2:]
+    N_pix = ny * nx
+
+    N = np.empty((N_chan, 3, N_pix))
+
+    for i, channel in enumerate(channels):
+        # load_N returns (3, ny, nx) for this one channel
+        N_single = load_N(telescope, channel, shape, wcs, pa=pa)
+        # flatten (ny, nx) -> N_pix, per your existing convention (matches d's layout)
+        N[i] = N_single.reshape(3, N_pix)
 
     return N
