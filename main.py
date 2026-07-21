@@ -48,13 +48,12 @@ d = make_cmb_and_foreground(freqs=act_freqs, T=T, a_cmb_stokes=cmb, dust_model=d
 
 N = load_N_multi_channel(telescope="act", channels=act_freqs, shape=shape, wcs=wcs, pa=None)
 
-mu0, S = make_test_prior(T, N, mode='tight')
+_, S = make_test_prior(T, N, mode='tight')
 print("T:", T.shape)
 print("d:", d.shape)
 print("N:", N.shape)
-print("mu0:", mu0.shape)
 print("S:", S.shape)
-x_sample = posterior_sample(T=T, d=d, N=N, mu0=mu0, S=S)
+x_sample = posterior_sample(T=T, d=d, N=N, S=S)
 
 nu_0_dust_stokes = [545.0, 353.0, 353.0]
 dust_model_amplitude = get_dust_truth_amplitude(dust_model, nu_0_dust_stokes, shape, wcs, rot=True)

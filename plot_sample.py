@@ -85,7 +85,7 @@ def analytic_posterior_mean_var(T, d, N, mu0, S, comp, stokes, pix):
 
 
 def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
-                            posterior_sample_fn, img_out_path, n_draws=3000):
+                            posterior_sample_fn, img_out_path, n_draws=1000):
     """
     Main verification function -- call this from main.py.
 

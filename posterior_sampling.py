@@ -24,7 +24,7 @@ def posterior_sample_1_pix(T, d, N):
 
     return x_sample
 
-def posterior_sample(T, d, N, mu0, S):
+def posterior_sample(T, d, N, S):
     """
     Multi pixel, multi component generalization of posterior_sample_1_pix.
 
@@ -34,14 +34,15 @@ def posterior_sample(T, d, N, mu0, S):
     For each pixel p and each Stokes parameter s independently, solves the small
     (N_comp x N_comp) linear system:
 
-        
+    (S^-1 + T^T N^-1 T) x = T^T N^-1 d + T^T N^-1/2 eta1 + S^-1/2 eta2
 
     where, restricted to pixel p / Stokes s:
         T   : (N_chan, N_comp) mixing matrix (SED scaling per component per channel)
         N   : (N_chan,)        diagonal noise variance per channel
         d   : (N_chan,)        observed data across channels
-        eta : (N_chan,)        iid N(0,1) draws (fluctuation term -> correct posterior variance,
+        eta1 : (N_chan,)        iid N(0,1) draws (fluctuation term -> correct posterior variance,
                                   not just the posterior mean)
+        eta2 : (N_comp,)        iid N(0,1) draws (prior fluctuation term)
         x   : (N_comp,)        sampled component amplitudes at this pixel (the CMB and dust)
         S   : (N_comp,)        prior variance for each component (diagonal, no cross-component prior covariance)
         mu0 : (N_comp,)        prior mean for each component
@@ -57,8 +58,6 @@ def posterior_sample(T, d, N, mu0, S):
         Diagonal noise covariance (variance), per channel / Stokes / pixel.
         NOTE: load_N gives you (3, ny, nx) per channel — stack over channels and
         flatten (ny, nx) -> N_pix before passing in here, to match d's layout.
-    mu0 : ndarray, shape (N_comp, N_stokes, N_pix)
-        Prior mean for each component amplitude.
     S : ndarray, shape (N_comp, N_stokes, N_pix)
         Prior variance (diagonal, no cross-component prior covariance).
         Use np.inf entries to recover the old no-prior behavior for that component.
@@ -78,13 +77,15 @@ def posterior_sample(T, d, N, mu0, S):
     # prior fluctuation term -- one draw per component (not per channel)
     eta2 = np.random.standard_normal(size=(N_comp, N_stokes, N_pix))
 
+    # for testing purposes
+    # eta1 = np.zeros((T.shape[0], T.shape[2], T.shape[3]))
+    # eta2 = np.zeros((T.shape[1], T.shape[2], T.shape[3]))
+
     T_T = np.transpose(T, (2, 3, 0, 1))
     d_T = np.transpose(d, (1, 2, 0))
     N_T = np.transpose(N, (1, 2, 0))
     eta1_T = np.transpose(eta1, (1, 2, 0))
 
-    # prior arrays, transposed the same way as mu0/S live per-component
-    mu0_T = np.transpose(mu0, (1, 2, 0))
     S_T = np.transpose(S, (1, 2, 0))
     eta2_T = np.transpose(eta2, (1, 2, 0))
 
@@ -102,8 +103,8 @@ def posterior_sample(T, d, N, mu0, S):
     # data part of rhs, same as before
     rhs_data = np.einsum('spfc,spf->spc', T_T, weighted_d + weighted_eta)
 
-    # prior part of rhs: S^-1 mu0 + S^-1/2 eta2
-    rhs_prior = Sinv * mu0_T + Sinv_sqrt * eta2_T
+    # prior part of rhs: S^-1/2 eta2
+    rhs_prior = Sinv_sqrt * eta2_T
 
     rhs = rhs_data + rhs_prior
 
@@ -114,9 +115,7 @@ def posterior_sample(T, d, N, mu0, S):
     comp_idx = np.arange(N_comp)
     lhs[..., comp_idx, comp_idx] += Sinv
 
-    print("lhs:", lhs.shape)
-    print("rhs:", rhs.shape)
-    # used to be: x_T = np.linalg.solve(lhs, rhs)
+    # fixed for no size mismatch, used to be: x_T = np.linalg.solve(lhs, rhs)
     x_T = np.linalg.solve(lhs, rhs[..., None])[..., 0]
     x_sample = np.transpose(x_T, (2, 0, 1))
 
