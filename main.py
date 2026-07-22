@@ -48,7 +48,7 @@ d = make_cmb_and_foreground(freqs=act_freqs, T=T, a_cmb_stokes=cmb, dust_model=d
 
 N = load_N_multi_channel(telescope="act", channels=act_freqs, shape=shape, wcs=wcs, pa=None)
 
-_, S = make_test_prior(T, N, mode='tight')
+S = make_test_prior(T, N, mode='tight')
 print("T:", T.shape)
 print("d:", d.shape)
 print("N:", N.shape)
