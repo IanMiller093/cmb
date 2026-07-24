@@ -28,8 +28,7 @@ def posterior_sample(T, d, N, S):
     """
     Multi pixel, multi component generalization of posterior_sample_1_pix.
 
-    Follows Appendix A.2 (BeyondPlanck), Eq. A.10, with the limit S^-1 -> 0 (no prior),
-    diagonal N (no pixel-pixel or channel-channel noise correlations), and no beam.
+    Follows Appendix A.2 (BeyondPlanck), Eq. A.10, with diagonal N (no pixel-pixel or channel-channel noise correlations), and no beam.
 
     For each pixel p and each Stokes parameter s independently, solves the small
     (N_comp x N_comp) linear system:
@@ -47,8 +46,7 @@ def posterior_sample(T, d, N, S):
         S   : (N_comp,)        prior variance for each component (diagonal, no cross-component prior covariance)
         mu0 : (N_comp,)        prior mean for each component
 
-    Parameters
-    ----------
+    Params
     T : ndarray, shape (N_chan, N_comp, N_stokes, N_pix)
         Mixing matrix. T[f, c, s, p] = contribution of component c to channel f's
         signal, at Stokes s, pixel p (CMB blackbody scaling, dust MBB scaling, etc.)
@@ -63,7 +61,6 @@ def posterior_sample(T, d, N, S):
         Use np.inf entries to recover the old no-prior behavior for that component.
 
     Returns
-    -------
     x_sample : ndarray, shape (N_comp, N_stokes, N_pix)
         One Gibbs sample of the component amplitude maps, e.g. x_sample[0] = CMB map,
         x_sample[1] = dust map, over every pixel and Stokes parameter.

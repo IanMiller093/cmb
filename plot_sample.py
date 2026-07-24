@@ -80,7 +80,7 @@ def analytic_posterior_mean_var(T, d, N, S, comp, stokes, pix):
 
 
 def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
-                            posterior_sample_fn, img_out_path, n_draws=1000):
+                            posterior_sample_fn, img_out_path, histogram=False, n_draws=1000):
     """
     Main verification function -- call this from main.py.
 
@@ -121,47 +121,54 @@ def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
     # --- (A) map triptych ---
     fig, axes = plt.subplots(2, 3, figsize=(12, 8))
 
-    axes[0, 0].imshow(truth[comp, stokes].reshape(ny, nx))
+    im = axes[0, 0].imshow(truth[comp, stokes].reshape(ny, nx))
     axes[0, 0].set_title('truth')
-    axes[0, 1].imshow(zero_map)
+    fig.colorbar(im, ax=axes[0, 0])
+    im = axes[0, 1].imshow(zero_map)
     axes[0, 1].set_title('zero (prior mean)')
-    axes[0, 2].imshow(x_tight[comp, stokes].reshape(ny, nx))
+    fig.colorbar(im, ax=axes[0, 1])
+    im = axes[0, 2].imshow(x_tight[comp, stokes].reshape(ny, nx))
     axes[0, 2].set_title('sample, tight prior')
+    fig.colorbar(im, ax=axes[0, 2])
 
-    axes[1, 0].imshow(truth[comp, stokes].reshape(ny, nx))
+    im = axes[1, 0].imshow(truth[comp, stokes].reshape(ny, nx))
     axes[1, 0].set_title('truth')
-    axes[1, 1].imshow(zero_map)
+    fig.colorbar(im, ax=axes[1, 0])
+    im = axes[1, 1].imshow(zero_map)
     axes[1, 1].set_title('zero (prior mean)')
-    axes[1, 2].imshow(x_loose[comp, stokes].reshape(ny, nx))
+    fig.colorbar(im, ax=axes[1, 1])
+    im = axes[1, 2].imshow(x_loose[comp, stokes].reshape(ny, nx))
     axes[1, 2].set_title('sample, loose prior')
+    fig.colorbar(im, ax=axes[1, 2])
 
     plt.tight_layout()
     plt.savefig(os.path.join(img_out_path, 'prior_verification_maps.png'))
     plt.close(fig)
 
     # --- (B) histogram vs analytic posterior, both regimes ---
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    if histogram:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
-    for ax, S, label in [
-        (axes[0], S_tight, 'tight prior'),
-        (axes[1], S_loose, 'loose prior'),
-    ]:
-        samples = np.zeros(n_draws)
-        for i in range(n_draws):
-            x = posterior_sample_fn(T, d, N, S)
-            samples[i] = x[comp, stokes, pix]
+        for ax, S, label in [
+            (axes[0], S_tight, 'tight prior'),
+            (axes[1], S_loose, 'loose prior'),
+        ]:
+            samples = np.zeros(n_draws)
+            for i in range(n_draws):
+                x = posterior_sample_fn(T, d, N, S)
+                samples[i] = x[comp, stokes, pix]
 
-        mean_p, var_p = analytic_posterior_mean_var(T, d, N, S, comp, stokes, pix)
+            mean_p, var_p = analytic_posterior_mean_var(T, d, N, S, comp, stokes, pix)
 
-        xs = np.linspace(samples.min(), samples.max(), 200)
-        gaussian = (1.0 / np.sqrt(2 * np.pi * var_p)) * np.exp(-(xs - mean_p)**2 / (2 * var_p))
+            xs = np.linspace(samples.min(), samples.max(), 200)
+            gaussian = (1.0 / np.sqrt(2 * np.pi * var_p)) * np.exp(-(xs - mean_p)**2 / (2 * var_p))
 
-        ax.hist(samples, bins=40, density=True, label='sampled')
-        ax.plot(xs, gaussian, label='analytic')
-        ax.axvline(mean_p, color='k', linestyle='--')
-        ax.set_title(label)
-        ax.legend()
+            ax.hist(samples, bins=40, density=True, label='sampled')
+            ax.plot(xs, gaussian, label='analytic')
+            ax.axvline(mean_p, color='k', linestyle='--')
+            ax.set_title(label)
+            ax.legend()
 
-    plt.tight_layout()
-    plt.savefig(os.path.join(img_out_path, 'prior_verification_histograms.png'))
-    plt.close(fig)
+        plt.tight_layout()
+        plt.savefig(os.path.join(img_out_path, 'prior_verification_histograms.png'))
+        plt.close(fig)
