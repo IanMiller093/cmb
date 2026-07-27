@@ -172,3 +172,74 @@ def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
         plt.tight_layout()
         plt.savefig(os.path.join(img_out_path, 'prior_verification_histograms.png'))
         plt.close(fig)
+
+
+
+def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
+                               comp_labels=None, stokes_labels=None,
+                               show_residual=True):
+    """
+    Plot truth vs sample (vs residual) for every component, separately for
+    each Stokes parameter -- this is the actual "did component separation
+    work" check, as opposed to run_prior_verification's single comp/stokes/pix
+    prior sanity check.
+
+    Produces one figure per Stokes parameter, saved as
+    'component_separation_{stokes_label}.png', with one row per component and
+    columns for truth / sample / (residual).
+
+    Parameters
+    ----------
+    x_sample : ndarray, shape (N_comp, N_stokes, N_pix)
+        Output of posterior_sample -- one Gibbs sample of the component
+        amplitude maps.
+    truth : ndarray, shape (N_comp, N_stokes, N_pix)
+        Ground truth component maps, same layout as x_sample.
+    ny, nx : int
+        Map dimensions, for reshaping 1D pixel arrays back to 2D for imshow.
+    img_out_path : str
+        Directory to save output figures into.
+    comp_labels : list of str or None
+        Names for each component, e.g. ['cmb', 'dust']. Defaults to
+        ['comp0', 'comp1', ...] if not given.
+    stokes_labels : list of str or None
+        Names for each Stokes parameter, e.g. ['I', 'Q', 'U']. Defaults to
+        ['stokes0', 'stokes1', ...] if not given.
+    show_residual : bool
+        If True, add a third column with (sample - truth).
+    """
+
+    N_comp, N_stokes, N_pix = x_sample.shape
+
+    if comp_labels is None:
+        comp_labels = [f'comp{c}' for c in range(N_comp)]
+    if stokes_labels is None:
+        stokes_labels = [f'stokes{s}' for s in range(N_stokes)]
+
+    n_cols = 3 if show_residual else 2
+
+    for s in range(N_stokes):
+        fig, axes = plt.subplots(N_comp, n_cols, figsize=(4 * n_cols, 4 * N_comp), squeeze=False)
+
+        for c in range(N_comp):
+            truth_map = truth[c, s].reshape(ny, nx)
+            sample_map = x_sample[c, s].reshape(ny, nx)
+
+            im = axes[c, 0].imshow(truth_map)
+            axes[c, 0].set_title(f'{comp_labels[c]} truth')
+            fig.colorbar(im, ax=axes[c, 0])
+
+            im = axes[c, 1].imshow(sample_map)
+            axes[c, 1].set_title(f'{comp_labels[c]} sample')
+            fig.colorbar(im, ax=axes[c, 1])
+
+            if show_residual:
+                resid_map = sample_map - truth_map
+                im = axes[c, 2].imshow(resid_map)
+                axes[c, 2].set_title(f'{comp_labels[c]} sample - truth')
+                fig.colorbar(im, ax=axes[c, 2])
+
+        fig.suptitle(f'Component separation, Stokes {stokes_labels[s]}')
+        plt.tight_layout()
+        plt.savefig(os.path.join(img_out_path, f'component_separation_{stokes_labels[s]}.png'))
+        plt.close(fig)
