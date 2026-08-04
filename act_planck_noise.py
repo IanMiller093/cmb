@@ -2,12 +2,52 @@ from astropy.io import fits
 import healpy as hp
 import numpy as np
 from pixell import enmap, reproject
+from scipy.ndimage import uniform_filter
 
 PLANCK_DIR_GPC = "/data5/planck/pr3"
 ACT_DIR_GPC = "/data5/act/maps/dr6v4_20230316"
 
 ACT_SETS = [0, 1, 2, 3]
 
+def fill_zero_ivar(ivar_np, max_iters=10, window=5):
+    """
+    Replace ivar==0 ("unobserved") pixels with a local average of nearby
+    nonzero ivar pixels. Iterates outward with a growing window in case a
+    patch of zeros is larger than one window, until all zeros are filled
+    or max_iters is hit. Operates per-Stokes-slice independently if 3D.
+    """
+    if ivar_np.ndim == 3:
+        return np.stack([fill_zero_ivar(ivar_np[i], max_iters, window) for i in range(ivar_np.shape[0])])
+
+    ivar_np = ivar_np.copy()
+    zero_mask = (ivar_np == 0)
+
+    if not zero_mask.any():
+        return ivar_np
+
+    w = window
+    for _ in range(max_iters):
+        if not zero_mask.any():
+            break
+
+        valid = (~zero_mask).astype(ivar_np.dtype)
+        sum_valid = uniform_filter(np.where(zero_mask, 0, ivar_np), size=w, mode='nearest') * w**2
+        count_valid = uniform_filter(valid, size=w, mode='nearest') * w**2
+
+        with np.errstate(invalid='ignore', divide='ignore'):
+            local_mean = np.where(count_valid > 0, sum_valid / count_valid, 0)
+
+        fillable = zero_mask & (count_valid > 0)
+        ivar_np[fillable] = local_mean[fillable]
+        zero_mask = zero_mask & ~fillable
+
+        w += 2
+
+    if zero_mask.any():
+        global_mean = ivar_np[~zero_mask].mean() if (~zero_mask).any() else 0.0
+        ivar_np[zero_mask] = global_mean
+
+    return ivar_np
 
 def load_planck_noise(channel):
     ivar_full = None
@@ -100,18 +140,18 @@ def accurate_noise(telescope, channel, shape, wcs, pa=None):
         return act_noise(channel=channel, shape=shape, wcs=wcs, pa=pa)
 
 def load_N(telescope, channel, shape, wcs, pa=None):
-    # Returns N, the (diagonal) noise covariance, as a map of shape (3, ny, nx).
-    
     if telescope == "planck":
         ivar_full = load_planck_noise(channel)
         ivar = enmap.project(ivar_full, (3,) + shape[-2:], wcs, order=0)
         ivar_np = np.array(ivar)
+        ivar_np = fill_zero_ivar(ivar_np)          # <-- inserted
         N = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
 
     else:
         ivar_full = load_act_noise(channel, pa)
         ivar = enmap.project(ivar_full, shape[-2:], wcs, order=0)
         ivar_np = np.array(ivar)
+        ivar_np = fill_zero_ivar(ivar_np)          # <-- inserted
         N_I = np.where(ivar_np > 0, 1.0 / ivar_np, np.inf)
 
         N = np.empty((3,) + shape[-2:])
