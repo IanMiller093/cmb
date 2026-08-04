@@ -41,14 +41,7 @@ def make_test_prior(T, N, mode, scale_factor=None):
 
     S = np.zeros((N_comp, N_stokes, N_pix))
     for c in range(N_comp):
-        if mode == 'tight':
-            # S small -> S^-1 large -> dominates over data_term_scale
-            S[c, :, :] = data_term_scale[c] * scale_factor
-        elif mode == 'loose':
-            # S large -> S^-1 small -> negligible next to data_term_scale
-            S[c, :, :] = data_term_scale[c] * scale_factor
-        else:
-            raise ValueError("mode must be 'tight' or 'loose'")
+        S[c, :, :] = data_term_scale[c] * scale_factor
 
     return S
 
@@ -177,7 +170,7 @@ def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
 
 def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
                                comp_labels=None, stokes_labels=None,
-                               show_residual=True):
+                               show_residual=True, share_colorbar=False):
     """
     Plot truth vs sample (vs residual) for every component, separately for
     each Stokes parameter -- this is the actual "did component separation
@@ -207,6 +200,10 @@ def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
         ['stokes0', 'stokes1', ...] if not given.
     show_residual : bool
         If True, add a third column with (sample - truth).
+    share_colorbar : bool
+        If True, all columns in each row (truth / sample / residual) share
+        one colorbar, scaled to the truth (left) image's range. If False
+        (default), each image gets its own independent colorbar.
     """
 
     N_comp, N_stokes, N_pix = x_sample.shape
@@ -225,21 +222,28 @@ def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
             truth_map = truth[c, s].reshape(ny, nx)
             sample_map = x_sample[c, s].reshape(ny, nx)
 
-            im = axes[c, 0].imshow(truth_map)
-            axes[c, 0].set_title(f'{comp_labels[c]} truth')
-            fig.colorbar(im, ax=axes[c, 0])
+            if share_colorbar:
+                vmin, vmax = truth_map.min(), truth_map.max()
+            else:
+                vmin = vmax = None  # let imshow auto-scale each independently
 
-            im = axes[c, 1].imshow(sample_map)
+            im0 = axes[c, 0].imshow(truth_map, vmin=vmin, vmax=vmax)
+            axes[c, 0].set_title(f'{comp_labels[c]} truth')
+            fig.colorbar(im0, ax=axes[c, 0])
+
+            im1 = axes[c, 1].imshow(sample_map, vmin=vmin, vmax=vmax)
             axes[c, 1].set_title(f'{comp_labels[c]} sample')
-            fig.colorbar(im, ax=axes[c, 1])
+            if not share_colorbar:
+                fig.colorbar(im1, ax=axes[c, 1])
 
             if show_residual:
                 resid_map = sample_map - truth_map
-                im = axes[c, 2].imshow(resid_map)
+                im2 = axes[c, 2].imshow(resid_map, vmin=vmin, vmax=vmax)
                 axes[c, 2].set_title(f'{comp_labels[c]} sample - truth')
-                fig.colorbar(im, ax=axes[c, 2])
+                if not share_colorbar:
+                    fig.colorbar(im2, ax=axes[c, 2])
 
         fig.suptitle(f'Component separation, Stokes {stokes_labels[s]}')
         plt.tight_layout()
-        plt.savefig(os.path.join(img_out_path, f'component_separation_{stokes_labels[s]}.png'))
+        plt.savefig(os.path.join(img_out_path, f'component_separation_{stokes_labels[s]}.png'), dpi=300)
         plt.close(fig)
