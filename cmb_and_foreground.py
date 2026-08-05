@@ -1,5 +1,4 @@
 from pixell_cmb import make_cmb
-from pysm_foreground import make_foreground
 from act_planck_beam import apply_beam
 from act_planck_noise import accurate_noise
 import pysm3
