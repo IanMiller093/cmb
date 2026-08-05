@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from scipy.stats import chi2
 
 
 def make_test_prior(T, N, mode, scale_factor=None):
@@ -247,3 +248,110 @@ def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
         plt.tight_layout()
         plt.savefig(os.path.join(img_out_path, f'component_separation_{stokes_labels[s]}.png'), dpi=300)
         plt.close(fig)
+
+def get_all_pixel_mean_var(T, d, N, S):
+    """
+
+    Returns
+    mean_all : ndarray, shape (N_comp, N_stokes, N_pix)
+    var_all  : ndarray, shape (N_comp, N_stokes, N_pix)
+        Diagonal of the posterior covariance at each pixel (i.e. the marginal
+        variance of each component, ignoring cross-component covariance).
+    """
+
+    N_chan, N_comp, N_stokes, N_pix = T.shape
+
+    Ninv = 1.0 / N          # (N_chan, N_stokes, N_pix)
+    Sinv = 1.0 / S          # (N_comp, N_stokes, N_pix)
+
+    # A[f,c,s,p] = T[f,c,s,p] * Ninv[f,s,p]
+    A = T * Ninv[:, None, :, :]
+
+    # lhs[s,p,c,e] = sum_f T[f,c,s,p] * Ninv[f,s,p] * T[f,e,s,p]
+    lhs = np.einsum('fcsp,fesp->spce', A, T)
+
+    # add diag(Sinv) on top -- only touches the c==e entries
+    diag_idx = np.arange(N_comp)
+    lhs[:, :, diag_idx, diag_idx] += np.transpose(Sinv, (1, 2, 0))  # (N_stokes, N_pix, N_comp)
+
+    # rhs[s,p,c] = sum_f T[f,c,s,p] * Ninv[f,s,p] * d[f,s,p]
+    rhs = np.einsum('fcsp,fsp->spc', T, Ninv * d)
+
+    # batched inversion over the leading (N_stokes, N_pix) dims
+    cov = np.linalg.inv(lhs)                       # (N_stokes, N_pix, N_comp, N_comp)
+    mean = np.einsum('spce,spe->spc', cov, rhs)     # (N_stokes, N_pix, N_comp)
+    var = np.diagonal(cov, axis1=2, axis2=3)        # (N_stokes, N_pix, N_comp)
+
+    # reshape to match the (N_comp, N_stokes, N_pix) amplitude convention used everywhere else
+    mean_all = np.transpose(mean, (2, 0, 1))
+    var_all = np.transpose(var, (2, 0, 1))
+
+    return mean_all, var_all
+
+
+def run_global_calibration_check(T, d, N, truth, ny, nx,
+                                  posterior_sample_fn, img_out_path, n_draws=1000,
+                                  comp_labels=None):
+    """
+    Parameters
+    T, d, N : as used by posterior_sample_fn
+    truth : ndarray, shape (N_comp, N_stokes, N_pix)
+        Only truth.shape is used, to get N_comp/N_stokes/N_pix; kept for
+        signature parity with run_prior_verification.
+    ny, nx : int
+        Unused directly here (kept for signature parity); map dimensions.
+    posterior_sample_fn : callable
+        Your posterior_sample function, passed in directly (not called).
+    img_out_path : str
+        Directory to save the output figure into.
+    n_draws : int
+        Number of Monte Carlo draws for the D histograms.
+    comp_labels : list of str or None
+        Labels for each component (e.g. ['cmb', 'dust']), used as row titles.
+        Defaults to ['comp0', 'comp1', ...] if not given.
+    """
+
+    N_comp, N_stokes, N_pix = truth.shape
+    N_total_per_comp = N_stokes * N_pix
+
+    if comp_labels is None:
+        comp_labels = [f'comp{c}' for c in range(N_comp)]
+
+    S_tight = make_test_prior(T, N, mode='tight')
+    S_loose = make_test_prior(T, N, mode='loose')
+
+    fig, axes = plt.subplots(N_comp, 2, figsize=(10, 4 * N_comp), squeeze=False)
+
+    for col, (S, prior_label) in enumerate([
+        (S_tight, 'tight prior'),
+        (S_loose, 'loose prior'),
+    ]):
+        mean_all, var_all = get_all_pixel_mean_var(T, d, N, S)
+
+        # D_samples_by_comp[c, i] = D for component c on draw i
+        D_samples_by_comp = np.zeros((N_comp, n_draws))
+        for i in range(n_draws):
+            x = posterior_sample_fn(T, d, N, S)
+            z = (x - mean_all) / np.sqrt(var_all)
+            D_samples_by_comp[:, i] = np.mean(z**2, axis=(1, 2)) 
+
+        for c in range(N_comp):
+            ax = axes[c, col]
+            D_samples = D_samples_by_comp[c]
+
+            # analytic density of D_c: sum(z_c^2) ~ chi2(N_total_per_comp),
+            # D_c = sum(z_c^2)/N_total_per_comp, so via change of variables
+            # pdf_D(x) = N_total_per_comp * chi2.pdf(N_total_per_comp * x, df=N_total_per_comp)
+            xs = np.linspace(D_samples.min(), D_samples.max(), 200)
+            analytic_pdf = N_total_per_comp * chi2.pdf(N_total_per_comp * xs, df=N_total_per_comp)
+
+            ax.hist(D_samples, bins=40, density=True, label='sampled')
+            ax.plot(xs, analytic_pdf, label='analytic (chi2/dof)')
+            ax.axvline(1.0, color='k', linestyle='--', label='expected (D=1)')
+            ax.set_title(f'{comp_labels[c]} -- {prior_label}')
+            ax.set_xlabel(f'D = mean(z^2) over stokes/pix, {comp_labels[c]} only')
+            ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(img_out_path, 'global_calibration_check.png'))
+    plt.close(fig)
