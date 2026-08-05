@@ -14,7 +14,7 @@ import pysm3
 import pysm3.units as u
 import time
 from posterior_sampling import posterior_sample
-from plot_sample import make_test_prior, run_prior_verification, plot_component_separation, run_global_calibration_check
+from plot_sample import make_test_prior, run_prior_verification, plot_component_separation, run_global_calibration_check, plot_sample_mean_map
 from plot_bandpass_sed import plot_bandpass_sed_overlay
 
 import numpy as np
@@ -28,7 +28,7 @@ def get_dust_truth_amplitude(dust_model, nu_0_dust_stokes, shape, wcs, rot):
     amp_maps = []
     for s, nu_ref in enumerate(nu_0_dust_stokes):
         emission = dust_model.get_emission(nu_ref * u.GHz)
-        stokes_map = emission[s].to(u.uK_RJ, equivalencies=u.cmb_equivalencies(nu_ref * u.GHz)).value
+        stokes_map = emission[s].to(u.uK_CMB, equivalencies=u.cmb_equivalencies(nu_ref * u.GHz)).value
         stokes_map_car = hp_to_car_wrapper(stokes_map, shape, wcs, rot=rot)
         amp_maps.append(stokes_map_car)
     return np.stack(amp_maps, axis=0)
@@ -52,4 +52,8 @@ comp = 0          # cmb
 stokes = 0        # I
 pix = N_pix // 2  # arbitrary central pixel; swap for one you care about
 
-run_global_calibration_check(T=T, d=d, N=N, truth=truth, ny=ny, nx=nx, posterior_sample_fn=posterior_sample, img_out_path=IMG_OUT_PATH, n_draws=1000, comp_labels=None)
+S_inv_loose = make_test_prior(T=T, N=N, mode="loose", scale_factor=None)
+S_inv_tight = make_test_prior(T=T, N=N, mode="tight", scale_factor=None)
+
+plot_sample_mean_map(T=T, d=d, N=N, S_inv=S_inv_loose, ny=ny, nx=nx, fileheader="mean_plot_S_loose", img_out_path=IMG_OUT_PATH, n_draws=1000)
+plot_sample_mean_map(T=T, d=d, N=N, S_inv=S_inv_tight, ny=ny, nx=nx, fileheader="mean_plot_S_tight", img_out_path=IMG_OUT_PATH, n_draws=1000)

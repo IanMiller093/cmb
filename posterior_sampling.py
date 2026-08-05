@@ -24,7 +24,7 @@ def posterior_sample_1_pix(T, d, N):
 
     return x_sample
 
-def posterior_sample(T, d, N, S):
+def posterior_sample(T, d, N, S_inv, zero_etas=False):
     """
     Multi pixel, multi component generalization of posterior_sample_1_pix.
 
@@ -56,9 +56,8 @@ def posterior_sample(T, d, N, S):
         Diagonal noise covariance (variance), per channel / Stokes / pixel.
         NOTE: load_N gives you (3, ny, nx) per channel — stack over channels and
         flatten (ny, nx) -> N_pix before passing in here, to match d's layout.
-    S : ndarray, shape (N_comp, N_stokes, N_pix)
-        Prior variance (diagonal, no cross-component prior covariance).
-        Use np.inf entries to recover the old no-prior behavior for that component.
+    S_inv : ndarray, shape (N_comp, N_stokes, N_pix)
+        Prior variance (diagonal, no cross-component prior covariance) inverse.
 
     Returns
     x_sample : ndarray, shape (N_comp, N_stokes, N_pix)
@@ -74,16 +73,15 @@ def posterior_sample(T, d, N, S):
     # prior fluctuation term -- one draw per component (not per channel)
     eta2 = np.random.standard_normal(size=(N_comp, N_stokes, N_pix))
 
-    # for testing purposes
-    # eta1 = np.zeros((T.shape[0], T.shape[2], T.shape[3]))
-    # eta2 = np.zeros((T.shape[1], T.shape[2], T.shape[3]))
+    if zero_etas:
+        eta1 = np.zeros((T.shape[0], T.shape[2], T.shape[3]))
+        eta2 = np.zeros((T.shape[1], T.shape[2], T.shape[3]))
 
     T_T = np.transpose(T, (2, 3, 0, 1))
     d_T = np.transpose(d, (1, 2, 0))
     N_T = np.transpose(N, (1, 2, 0))
     eta1_T = np.transpose(eta1, (1, 2, 0))
 
-    S_T = np.transpose(S, (1, 2, 0))
     eta2_T = np.transpose(eta2, (1, 2, 0))
 
     Ninv = 1.0 / N_T
@@ -91,8 +89,7 @@ def posterior_sample(T, d, N, S):
 
     # S can have np.inf entries (no prior on that component) -- 1/inf = 0 is fine,
     # sqrt(0) = 0 is fine, no nan risk here
-    Sinv = 1.0 / S_T
-    Sinv_sqrt = np.sqrt(Sinv)
+    Sinv_sqrt = np.sqrt(S_inv)
 
     weighted_d = Ninv * d_T
     weighted_eta = Ninv_sqrt * eta1_T

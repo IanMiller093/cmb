@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import chi2
-
+from posterior_sampling import posterior_sample
 
 def make_test_prior(T, N, mode, scale_factor=None):
     """
@@ -40,14 +40,14 @@ def make_test_prior(T, N, mode, scale_factor=None):
     if scale_factor is None:
         scale_factor = 1e-4 if mode == 'tight' else 1e4
 
-    S = np.zeros((N_comp, N_stokes, N_pix))
+    S_inv = np.zeros((N_comp, N_stokes, N_pix))
     for c in range(N_comp):
-        S[c, :, :] = data_term_scale[c] * scale_factor
+        S_inv[c, :, :] = data_term_scale[c] * scale_factor
 
-    return S
+    return S_inv
 
 
-def analytic_posterior_mean_var(T, d, N, S, comp, stokes, pix):
+def analytic_posterior_mean_var(T, d, N, S_inv, comp, stokes, pix):
     """
     Closed-form posterior mean and variance at a single pixel/component/stokes,
     with eta terms set to zero (i.e. this is the mean of the distribution
@@ -59,10 +59,9 @@ def analytic_posterior_mean_var(T, d, N, S, comp, stokes, pix):
     T_p = T[:, :, stokes, pix]      # (N_chan, N_comp)
     N_p = N[:, stokes, pix]         # (N_chan,)
     d_p = d[:, stokes, pix]         # (N_chan,)
-    S_p = S[:, stokes, pix]         # (N_comp,)
+    Sinv_p = S_inv[:, stokes, pix]  # (N_comp,) -- already precision, no inversion needed
 
     Ninv_p = 1.0 / N_p
-    Sinv_p = 1.0 / S_p
 
     lhs_p = T_p.T @ np.diag(Ninv_p) @ T_p + np.diag(Sinv_p)
     rhs_p = T_p.T @ (Ninv_p * d_p)
@@ -102,11 +101,11 @@ def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
         Number of Monte Carlo draws for the histogram check.
     """
 
-    S_tight = make_test_prior(T, N, mode='tight')
-    S_loose = make_test_prior(T, N, mode='loose')
+    S_inv_tight = make_test_prior(T, N, mode='tight')
+    S_inv_loose = make_test_prior(T, N, mode='loose')
 
     x_tight = posterior_sample_fn(T, d, N, S_tight)
-    x_loose = posterior_sample_fn(T, d, N, S_loose)
+    x_loose = posterior_sample_fn(T, d, N, S_inv_loose)
 
     # zero map, for the "prior mean" column -- the prior is zero-mean, so this
     # is what a tight prior should pull the sample toward
@@ -144,8 +143,8 @@ def run_prior_verification(T, d, N, truth, comp, stokes, pix, ny, nx,
         fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
         for ax, S, label in [
-            (axes[0], S_tight, 'tight prior'),
-            (axes[1], S_loose, 'loose prior'),
+            (axes[0], S_inv_tight, 'tight prior'),
+            (axes[1], S_inv_loose, 'loose prior'),
         ]:
             samples = np.zeros(n_draws)
             for i in range(n_draws):
@@ -249,7 +248,7 @@ def plot_component_separation(x_sample, truth, ny, nx, img_out_path,
         plt.savefig(os.path.join(img_out_path, f'component_separation_{stokes_labels[s]}.png'), dpi=300)
         plt.close(fig)
 
-def get_all_pixel_mean_var(T, d, N, S):
+def get_all_pixel_mean_var(T, d, N, S_inv):
     """
 
     Returns
@@ -262,7 +261,6 @@ def get_all_pixel_mean_var(T, d, N, S):
     N_chan, N_comp, N_stokes, N_pix = T.shape
 
     Ninv = 1.0 / N          # (N_chan, N_stokes, N_pix)
-    Sinv = 1.0 / S          # (N_comp, N_stokes, N_pix)
 
     # A[f,c,s,p] = T[f,c,s,p] * Ninv[f,s,p]
     A = T * Ninv[:, None, :, :]
@@ -272,7 +270,7 @@ def get_all_pixel_mean_var(T, d, N, S):
 
     # add diag(Sinv) on top -- only touches the c==e entries
     diag_idx = np.arange(N_comp)
-    lhs[:, :, diag_idx, diag_idx] += np.transpose(Sinv, (1, 2, 0))  # (N_stokes, N_pix, N_comp)
+    lhs[:, :, diag_idx, diag_idx] += np.transpose(S_inv, (1, 2, 0))  # (N_stokes, N_pix, N_comp)
 
     # rhs[s,p,c] = sum_f T[f,c,s,p] * Ninv[f,s,p] * d[f,s,p]
     rhs = np.einsum('fcsp,fsp->spc', T, Ninv * d)
@@ -317,21 +315,21 @@ def run_global_calibration_check(T, d, N, truth, ny, nx,
     if comp_labels is None:
         comp_labels = [f'comp{c}' for c in range(N_comp)]
 
-    S_tight = make_test_prior(T, N, mode='tight')
-    S_loose = make_test_prior(T, N, mode='loose')
+    S_inv_tight = make_test_prior(T, N, mode='tight')
+    S_inv_loose = make_test_prior(T, N, mode='loose')
 
     fig, axes = plt.subplots(N_comp, 2, figsize=(10, 4 * N_comp), squeeze=False)
 
-    for col, (S, prior_label) in enumerate([
-        (S_tight, 'tight prior'),
-        (S_loose, 'loose prior'),
+    for col, (S_inv, prior_label) in enumerate([
+        (S_inv_tight, 'tight prior'),
+        (S_inv_loose, 'loose prior'),
     ]):
         mean_all, var_all = get_all_pixel_mean_var(T, d, N, S)
 
         # D_samples_by_comp[c, i] = D for component c on draw i
         D_samples_by_comp = np.zeros((N_comp, n_draws))
         for i in range(n_draws):
-            x = posterior_sample_fn(T, d, N, S)
+            x = posterior_sample_fn(T, d, N, S_inv)
             z = (x - mean_all) / np.sqrt(var_all)
             D_samples_by_comp[:, i] = np.mean(z**2, axis=(1, 2)) 
 
@@ -355,3 +353,67 @@ def run_global_calibration_check(T, d, N, truth, ny, nx,
     plt.tight_layout()
     plt.savefig(os.path.join(img_out_path, 'global_calibration_check.png'))
     plt.close(fig)
+
+def plot_sample_mean_map(T, d, N, S, ny, nx, img_out_path, fileheader, n_draws=1000):
+    """
+    returns nothing, saves 3 * 2 png images, one for each Stokes components and dust/cmb comp.
+ 
+    For each frequency channel, takes the eta = 0 case, and plots that alongside the sample mean of like 1000 different samples, so two pictures for each saved png file.
+    
+    To get eta=0 case, take posterior_sample(T, d, N, S, zero_etas=True), for sample mean, take mean over 1000 different samples with zero_etas=False.  Plot both side by side with one color bar.
+ 
+    """
+ 
+    stokes_labels = ['I', 'Q', 'U']
+ 
+    N_comp, N_stokes, N_pix = T.shape[1], T.shape[2], T.shape[3]
+    comp_labels = [f'comp{c}' for c in range(N_comp)]
+ 
+    # eta=0 case: single deterministic solve
+    x_zero_eta = posterior_sample(T, d, N, S, zero_etas=True)
+ 
+    # sample mean: average over n_draws stochastic solves
+    x_sum = np.zeros((N_comp, N_stokes, N_pix))
+    for _ in range(n_draws):
+        x_sum += posterior_sample(T, d, N, S, zero_etas=False)
+    x_mean = x_sum / n_draws
+ 
+    for c in range(N_comp):
+        for s in range(N_stokes):
+            zero_eta_map = x_zero_eta[c, s, :].reshape(ny, nx)
+            mean_map = x_mean[c, s, :].reshape(ny, nx)
+ 
+            vmin = min(zero_eta_map.min(), mean_map.min())
+            vmax = max(zero_eta_map.max(), mean_map.max())
+ 
+            fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+ 
+            im0 = axes[0].imshow(zero_eta_map, origin='lower', vmin=vmin, vmax=vmax)
+            axes[0].set_title(f'{comp_labels[c]} -- eta=0')
+ 
+            im1 = axes[1].imshow(mean_map, origin='lower', vmin=vmin, vmax=vmax)
+            axes[1].set_title(f'{comp_labels[c]} -- sample mean (n={n_draws})')
+ 
+            fig.colorbar(im1, ax=axes, orientation='vertical', fraction=0.046, pad=0.04)
+ 
+            fig.suptitle(f'Stokes {stokes_labels[s]}, {comp_labels[c]}')
+ 
+            out_name = f'{fileheader}_stokes_{stokes_labels[s]}_chan{c}.png'
+            plt.savefig(os.path.join(img_out_path, out_name))
+            plt.close(fig)
+ 
+
+def plot_covar_maps():
+    """
+    returns nothing, saves 3 * 3 png images, one for each Stokes component and each covariance (dust with dust variance, cmb with cmb variance, and cmb with dust).
+
+    Each image should have two side by side pictures.
+
+    Calculates true variance matrix/numpy tensor using F^-1 = S^-1 + T^T N^-1 T.  Get F from inverse (F^-1)
+
+    For every pixel, stokes component, there should be a 2x2 matrix thingy containing CC, CD, DC, DD (CD = DC for symmetric matrix).
+
+    Save one image containing a map of true CC values for each pixel with sample CC values, same for CD and DD.
+    """
+
+    pass
