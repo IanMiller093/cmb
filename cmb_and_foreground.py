@@ -95,18 +95,23 @@ def make_a_cmb(dec_radius, ra_radius, seed, res_arcmin, flatsky):
 
 
 
-def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_list=["d0"], res_arcmin=1):
 
+def make_dust_model(res_arcmin, dust_list):
+    sky_nside  = 1
+    while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
+       sky_nside *= 2
+    
+    sky = pysm3.Sky(nside=sky_nside, max_nside=sky_nside, preset_strings=dust_list)
+    dust_model = sky.components[0]
+
+    return dust_model
+
+
+
+def make_T(N_pix, dust_model, shape, wcs, beam_telescope, rot, freqs, dust_list=["d0"]):
     N_chan = len(freqs)
     N_comp = 2
     N_stokes = 3
-
-    sky_nside  = 1
-    while hp.nside2resol(sky_nside, arcmin=True) > res_arcmin:
-        sky_nside *= 2
-
-    sky = pysm3.Sky(nside=sky_nside, max_nside=sky_nside, preset_strings=dust_list)
-    dust_model = sky.components[0]
 
     beta_dust = dust_model.mbb_index.value.squeeze()
     T_dust = dust_model.mbb_temperature.value.squeeze()
@@ -142,7 +147,7 @@ def make_T_and_dust_model(N_pix, shape, wcs, beam_telescope, rot, freqs, dust_li
         f"beta_dust sample={np.atleast_1d(dust_model.mbb_index.value.squeeze())[:3]}, "
         f"T_dust sample={np.atleast_1d(dust_model.mbb_temperature.value.squeeze())[:3]}")
 
-    return T, dust_model
+    return T
 
 
 
